@@ -172,6 +172,9 @@ contract VaultFactory is ReentrancyGuard {
         // Transfer initial rewards to the newly deployed vault
         IERC20(asset).safeTransfer(vaultAddress, vaultDeposit);
 
+        // Automatically register the initial rewards in the vault's rewards pool
+        newVault.initializeRewardsPool(vaultDeposit);
+
         // Store vault metadata in factory
         uint256 vaultIndex = allVaults.length;
 
