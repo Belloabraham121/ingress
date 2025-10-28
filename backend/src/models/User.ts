@@ -2,10 +2,14 @@ import mongoose, { Schema, Document } from "mongoose";
 import bcrypt from "bcryptjs";
 
 export interface IUser extends Document {
-  fullName: string;
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
   walletId?: mongoose.Types.ObjectId;
+  bankAccountId?: mongoose.Types.ObjectId;
+  bvn?: string;
+  phone?: string;
   createdAt: Date;
   updatedAt: Date;
   comparePassword(candidatePassword: string): Promise<boolean>;
@@ -13,9 +17,14 @@ export interface IUser extends Document {
 
 const UserSchema: Schema = new Schema(
   {
-    fullName: {
+    firstName: {
       type: String,
-      required: [true, "Full name is required"],
+      required: [true, "First name is required"],
+      trim: true,
+    },
+    lastName: {
+      type: String,
+      required: [true, "Last name is required"],
       trim: true,
     },
     email: {
@@ -38,6 +47,20 @@ const UserSchema: Schema = new Schema(
     walletId: {
       type: Schema.Types.ObjectId,
       ref: "Wallet",
+    },
+    bankAccountId: {
+      type: Schema.Types.ObjectId,
+      ref: "BankAccount",
+    },
+    bvn: {
+      type: String,
+      minlength: 11,
+      maxlength: 11,
+      sparse: true, // Allows multiple null values while enforcing uniqueness for non-null values
+    },
+    phone: {
+      type: String,
+      trim: true,
     },
   },
   {

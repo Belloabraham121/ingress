@@ -51,7 +51,7 @@ export const protect = async (
       }
 
       // Attach user to request
-      (req as any).user = { id: user._id.toString() };
+      (req as any).user = { id: String(user._id) };
       next();
     } catch (error) {
       res.status(401).json({
@@ -68,4 +68,3 @@ export const protect = async (
     });
   }
 };
-

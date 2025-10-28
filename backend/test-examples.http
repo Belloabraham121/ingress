@@ -13,7 +13,8 @@ POST {{baseUrl}}/api/auth/register
 Content-Type: application/json
 
 {
-  "fullName": "John Doe",
+  "firstName": "John",
+  "lastName": "Doe",
   "email": "john.doe@example.com",
   "password": "password123"
 }
@@ -23,7 +24,8 @@ POST {{baseUrl}}/api/auth/register
 Content-Type: application/json
 
 {
-  "fullName": "Jane Smith",
+  "firstName": "Jane",
+  "lastName": "Smith",
   "email": "jane.smith@example.com",
   "password": "password123"
 }
@@ -54,12 +56,36 @@ Authorization: Bearer {{token}}
 POST {{baseUrl}}/api/auth/fund-wallet
 Authorization: Bearer {{token}}
 
+### Send HBAR to User's Wallet
+POST {{baseUrl}}/api/auth/send-hbar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "amount": "10"
+}
+
+### Transfer HBAR to Another Account
+POST {{baseUrl}}/api/auth/transfer-hbar
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "toAccountId": "0.0.12345",
+  "amount": "5"
+}
+
+### Get Wallet Balance
+GET {{baseUrl}}/api/auth/wallet-balance
+Authorization: Bearer {{token}}
+
 ### Test Invalid Email
 POST {{baseUrl}}/api/auth/register
 Content-Type: application/json
 
 {
-  "fullName": "Test User",
+  "firstName": "Test",
+  "lastName": "User",
   "email": "invalid-email",
   "password": "password123"
 }

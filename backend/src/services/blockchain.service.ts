@@ -136,6 +136,169 @@ export class BlockchainService {
   }
 
   /**
+   * Transfer HBAR between accounts (user to user)
+   */
+  async transferHBAR(
+    fromAccountId: string,
+    fromPrivateKey: string,
+    toAccountId: string,
+    amount: string
+  ): Promise<{
+    success: boolean;
+    txId?: string;
+    message: string;
+    balance?: string;
+  }> {
+    try {
+      // Validate inputs
+      if (!this.isValidAccountId(fromAccountId)) {
+        return {
+          success: false,
+          message: "Invalid sender account ID",
+        };
+      }
+
+      if (!this.isValidAccountId(toAccountId)) {
+        return {
+          success: false,
+          message: "Invalid recipient account ID",
+        };
+      }
+
+      const amountHbar = Hbar.fromString(amount);
+
+      // Validate amount is positive
+      if (amountHbar.toTinybars().toNumber() <= 0) {
+        return {
+          success: false,
+          message: "Amount must be greater than 0",
+        };
+      }
+
+      // Create client with sender's credentials
+      const senderKey = PrivateKey.fromStringECDSA(fromPrivateKey);
+      const senderClient = Client.forTestnet().setOperator(
+        AccountId.fromString(fromAccountId),
+        senderKey
+      );
+
+      // Check sender's balance first
+      const senderBalance = await new AccountBalanceQuery()
+        .setAccountId(AccountId.fromString(fromAccountId))
+        .execute(senderClient);
+
+      if (
+        senderBalance.hbars.toTinybars().toNumber() <
+        amountHbar.toTinybars().toNumber()
+      ) {
+        return {
+          success: false,
+          message: "Insufficient balance",
+          balance: senderBalance.hbars.toString(),
+        };
+      }
+
+      // Create and execute transfer transaction
+      const transaction = new TransferTransaction()
+        .addHbarTransfer(
+          AccountId.fromString(fromAccountId),
+          amountHbar.negated()
+        )
+        .addHbarTransfer(AccountId.fromString(toAccountId), amountHbar);
+
+      const txResponse = await transaction.execute(senderClient);
+      const receipt = await txResponse.getReceipt(senderClient);
+
+      // Get updated balance
+      const newBalance = await new AccountBalanceQuery()
+        .setAccountId(AccountId.fromString(fromAccountId))
+        .execute(senderClient);
+
+      if (receipt.status.toString() === "SUCCESS") {
+        console.log(
+          `✅ Transferred ${amount} HBAR from ${fromAccountId} to ${toAccountId}: ${txResponse.transactionId}`
+        );
+        return {
+          success: true,
+          txId: txResponse.transactionId.toString(),
+          message: `Successfully transferred ${amount} HBAR`,
+          balance: newBalance.hbars.toString(),
+        };
+      } else {
+        return {
+          success: false,
+          message: "Transaction failed during execution",
+        };
+      }
+    } catch (error) {
+      console.error("Error transferring HBAR:", error);
+      return {
+        success: false,
+        message: `Failed to transfer HBAR: ${(error as Error).message}`,
+      };
+    }
+  }
+
+  /**
+   * Send HBAR from operator to any account (for testing/funding)
+   */
+  async sendHBAR(
+    toAccountId: string,
+    amount: string
+  ): Promise<{
+    success: boolean;
+    txId?: string;
+    message: string;
+  }> {
+    try {
+      if (!this.isValidAccountId(toAccountId)) {
+        return {
+          success: false,
+          message: "Invalid recipient account ID",
+        };
+      }
+
+      const amountHbar = Hbar.fromString(amount);
+
+      if (amountHbar.toTinybars().toNumber() <= 0) {
+        return {
+          success: false,
+          message: "Amount must be greater than 0",
+        };
+      }
+
+      const transaction = new TransferTransaction()
+        .addHbarTransfer(this.operatorId, amountHbar.negated())
+        .addHbarTransfer(AccountId.fromString(toAccountId), amountHbar);
+
+      const txResponse = await transaction.execute(this.client);
+      const receipt = await txResponse.getReceipt(this.client);
+
+      if (receipt.status.toString() === "SUCCESS") {
+        console.log(
+          `✅ Sent ${amount} HBAR to ${toAccountId}: ${txResponse.transactionId}`
+        );
+        return {
+          success: true,
+          txId: txResponse.transactionId.toString(),
+          message: `Successfully sent ${amount} HBAR`,
+        };
+      } else {
+        return {
+          success: false,
+          message: "Transaction failed during execution",
+        };
+      }
+    } catch (error) {
+      console.error("Error sending HBAR:", error);
+      return {
+        success: false,
+        message: `Failed to send HBAR: ${(error as Error).message}`,
+      };
+    }
+  }
+
+  /**
    * Validate Hedera account ID format
    */
   isValidAccountId(accountId: string): boolean {

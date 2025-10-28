@@ -4,6 +4,9 @@ import morgan from "morgan";
 import { connectDatabase } from "./config/database";
 import { env } from "./config/env";
 import authRoutes from "./routes/auth.routes";
+import bankAccountRoutes from "./routes/bankAccount.routes";
+import webhookRoutes from "./routes/webhook.routes";
+import paymentRoutes from "./routes/payment.routes";
 
 const app: Application = express();
 
@@ -23,6 +26,9 @@ app.get("/", (req: Request, res: Response) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/bank-account", bankAccountRoutes);
+app.use("/api/webhook", webhookRoutes);
+app.use("/api/payment", paymentRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: any) => {
@@ -63,4 +69,3 @@ const startServer = async () => {
 startServer();
 
 export default app;
-
