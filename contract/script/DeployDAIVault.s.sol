@@ -21,7 +21,7 @@ contract DeployDAIVault is Script {
     address constant VAULT_FACTORY = 0x29021eaeb230Bc84120C0f05FDD83C446270c4f7;
 
     /// @notice DAI token address (already deployed)
-    address constant DAI = 0x0a80098112bc1B9BaC8be558C9Bd3DB8f4eB4ba6;
+    address constant DAI = 0x3814F5Cf6c4Aa63EdDF8A79c82346a163c7E7C53;
 
     // ============ Vault Parameters ============
 

@@ -2,21 +2,25 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { ethers } from "ethers";
-import {
-  FormattedVaultDetails,
-  VaultStats,
-  VaultSortCriteria,
-} from "@/types/vault";
+import { FormattedVaultDetails, VaultStats } from "@/types/vault";
 import {
   formatVaultDetails,
   calculateVaultStats,
   sortVaults,
   filterVaults,
+  VaultSortCriteria,
 } from "@/lib/vault-utils";
 import VaultFactoryABI from "@/lib/contracts/VaultFactory.json";
 
 const VAULT_FACTORY_ADDRESS = VaultFactoryABI.address;
 const HEDERA_TESTNET_RPC = "https://testnet.hashio.io/api";
+
+// Deployed vault addresses (from deployment scripts)
+const DEPLOYED_VAULTS = [
+  "0x297375e521c0b864783000279faec4583a167453", // USDT Vault (18% APY)
+  "0x4f2f9b9b32cd1062c1bc4c02dd7a6b8cd9eeee8c", // USDC Vault (12% APY)
+  "0xcdeb6cd4b06c026fdd37fcac346b31dc90f6d084", // DAI Vault (15% APY)
+];
 
 /**
  * Custom hook to interact with VaultFactory contract on Hedera
@@ -61,10 +65,10 @@ export function useVaults() {
     setError(null);
 
     try {
-      console.log("Fetching all vault addresses...");
+      console.log("Fetching vault details...");
 
-      // Step 1: Get all vault addresses
-      const vaultAddresses = await contract.getAllVaults();
+      // Use hardcoded vault addresses (already deployed)
+      const vaultAddresses = DEPLOYED_VAULTS;
       console.log(`Found ${vaultAddresses.length} vaults`);
 
       if (vaultAddresses.length === 0) {
@@ -81,10 +85,15 @@ export function useVaults() {
         return;
       }
 
-      // Step 2: Get detailed info for all vaults in one call
-      console.log("Fetching vault details...");
-      const [vaultDatas, totalDeposits, rewardPools, depositorCounts] =
-        await contract.getMultipleVaultDetails(vaultAddresses);
+      // Get detailed info for all vaults in one call
+      console.log("Calling getMultipleVaultDetails...");
+      const result = await contract.getMultipleVaultDetails(vaultAddresses);
+
+      // Convert read-only arrays to regular arrays
+      const vaultDatas = Array.from(result[0] as any[]);
+      const totalDeposits = Array.from(result[1] as bigint[]);
+      const rewardPools = Array.from(result[2] as bigint[]);
+      const depositorCounts = Array.from(result[3] as bigint[]);
 
       // Step 3: Format the data
       const formattedVaults: FormattedVaultDetails[] = vaultDatas.map(
@@ -102,9 +111,9 @@ export function useVaults() {
               vaultIndex: BigInt(vaultData.vaultIndex),
               active: vaultData.active,
             },
-            BigInt(totalDeposits[index]),
-            BigInt(rewardPools[index]),
-            BigInt(depositorCounts[index])
+            totalDeposits[index],
+            rewardPools[index],
+            depositorCounts[index]
           );
         }
       );
@@ -216,13 +225,13 @@ export function useVaults() {
     setError(null);
 
     try {
-      console.log("Fetching active vault addresses...");
+      console.log("Fetching active vault details...");
 
-      // Get active vault addresses
-      const activeVaultAddresses = await contract.getActiveVaults();
-      console.log(`Found ${activeVaultAddresses.length} active vaults`);
+      // Use hardcoded vault addresses (filter for active ones after fetching details)
+      const vaultAddresses = DEPLOYED_VAULTS;
+      console.log(`Checking ${vaultAddresses.length} vaults for active status`);
 
-      if (activeVaultAddresses.length === 0) {
+      if (vaultAddresses.length === 0) {
         setVaults([]);
         setStats({
           totalVaults: 0,
@@ -236,9 +245,14 @@ export function useVaults() {
         return;
       }
 
-      // Get detailed info for active vaults
-      const [vaultDatas, totalDeposits, rewardPools, depositorCounts] =
-        await contract.getMultipleVaultDetails(activeVaultAddresses);
+      // Get detailed info for all vaults, then filter for active ones
+      const result = await contract.getMultipleVaultDetails(vaultAddresses);
+
+      // Convert read-only arrays to regular arrays
+      const vaultDatas = Array.from(result[0] as any[]);
+      const totalDeposits = Array.from(result[1] as bigint[]);
+      const rewardPools = Array.from(result[2] as bigint[]);
+      const depositorCounts = Array.from(result[3] as bigint[]);
 
       const formattedVaults: FormattedVaultDetails[] = vaultDatas.map(
         (vaultData: any, index: number) => {
@@ -255,16 +269,18 @@ export function useVaults() {
               vaultIndex: BigInt(vaultData.vaultIndex),
               active: vaultData.active,
             },
-            BigInt(totalDeposits[index]),
-            BigInt(rewardPools[index]),
-            BigInt(depositorCounts[index])
+            totalDeposits[index],
+            rewardPools[index],
+            depositorCounts[index]
           );
         }
       );
 
-      const vaultStats = calculateVaultStats(formattedVaults);
+      // Filter for active vaults only
+      const activeVaults = formattedVaults.filter((v) => v.active);
+      const vaultStats = calculateVaultStats(activeVaults);
 
-      setVaults(formattedVaults);
+      setVaults(activeVaults);
       setStats(vaultStats);
     } catch (err: any) {
       console.error("Error fetching active vaults:", err);
