@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import { TokenVaultCard } from "@/components/token-vault-card";
 import { InvestConfirmationModal } from "@/components/invest-confirmation-modal";
 import { useVaults } from "@/hooks/useVaults";
+import { useVaultDeposit } from "@/hooks/useVaultDeposit";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertCircle, RefreshCw } from "lucide-react";
+import { AlertCircle, RefreshCw, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useToast } from "@/hooks/use-toast";
 
 interface TokenVault {
   id: string;
@@ -20,15 +22,26 @@ interface TokenVault {
   status: "active" | "paused";
   realTimeApy?: number;
   vaultAddress?: string;
+  tokenAddress?: string; // Asset (token) address
   depositorCount?: number;
   daysRemaining?: number;
 }
 
 export function TokenVaultSelector() {
   const { vaults, isLoading, error, refresh } = useVaults();
+  const { deposit, isDepositing, error: depositError } = useVaultDeposit();
+  const { toast } = useToast();
   const [selectedVault, setSelectedVault] = useState<string>("");
   const [depositAmount, setDepositAmount] = useState("");
   const [showConfirmation, setShowConfirmation] = useState(false);
+
+  // Store confirmation details to prevent recalculation when depositAmount clears
+  const [confirmationDetails, setConfirmationDetails] = useState({
+    amount: "",
+    symbol: "",
+    projectedReturn: "0.00",
+    projectedEarnings: "0.00",
+  });
 
   // Convert blockchain vaults to TokenVault format
   const tokenVaults: TokenVault[] = useMemo(() => {
@@ -46,6 +59,7 @@ export function TokenVaultSelector() {
         status: vault.active ? ("active" as const) : ("paused" as const),
         realTimeApy: vault.apr, // Real-time APY from blockchain
         vaultAddress: vault.vaultAddress,
+        tokenAddress: vault.asset, // Asset (token) address for approvals
         depositorCount: vault.depositorCount,
         daysRemaining: vault.daysRemaining,
       }));
@@ -59,7 +73,17 @@ export function TokenVaultSelector() {
   }, [tokenVaults, selectedVault]);
 
   const selected = tokenVaults.find((vault) => vault.id === selectedVault);
+
+  // Calculate projected return: deposit amount + APY earnings
   const projectedReturn = selected
+    ? (
+        Number.parseFloat(depositAmount || "0") *
+        (1 + selected.apy / 100)
+      ).toFixed(2)
+    : "0.00";
+
+  // Calculate just the earnings for display
+  const projectedEarnings = selected
     ? (Number.parseFloat(depositAmount || "0") * (selected.apy / 100)).toFixed(
         2
       )
@@ -70,13 +94,55 @@ export function TokenVaultSelector() {
       depositAmount &&
       Number.parseFloat(depositAmount) >= (selected?.minDeposit || 0)
     ) {
+      // Store the current values before opening modal
+      setConfirmationDetails({
+        amount: depositAmount,
+        symbol: selected?.symbol || "",
+        projectedReturn,
+        projectedEarnings,
+      });
       setShowConfirmation(true);
     }
   };
 
-  const handleConfirmDeposit = () => {
-    setShowConfirmation(false);
-    setDepositAmount("");
+  const handleConfirmDeposit = async (): Promise<{
+    success: boolean;
+    txHash?: string;
+  }> => {
+    if (!selected || !confirmationDetails.amount) {
+      return { success: false };
+    }
+
+    try {
+      const result = await deposit({
+        vaultAddress: selected.vaultAddress!,
+        tokenAddress: selected.tokenAddress!,
+        amount: confirmationDetails.amount,
+      });
+
+      if (result.success && result.txHash) {
+        // Refresh vault data after successful deposit
+        refresh();
+        // Clear deposit amount and close confirmation
+        setDepositAmount("");
+        return { success: true, txHash: result.txHash };
+      } else {
+        toast({
+          title: "Deposit Failed ❌",
+          description: "Failed to deposit into vault",
+          variant: "destructive",
+        });
+        return { success: false };
+      }
+    } catch (err: any) {
+      console.error("Deposit error:", err);
+      toast({
+        title: "Deposit Failed ❌",
+        description: err.message || "Failed to deposit into vault",
+        variant: "destructive",
+      });
+      return { success: false };
+    }
   };
 
   return (
@@ -109,6 +175,14 @@ export function TokenVaultSelector() {
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Deposit Error State */}
+        {depositError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{depositError}</AlertDescription>
           </Alert>
         )}
 
@@ -192,10 +266,14 @@ export function TokenVaultSelector() {
                 </span>
               </div>
               <div className="flex justify-between text-sm font-mono">
-                <span className="text-foreground/60">
-                  Projected Annual Return:
-                </span>
+                <span className="text-foreground/60">Annual Earnings:</span>
                 <span className="text-primary">
+                  +{projectedEarnings} {selected.symbol}
+                </span>
+              </div>
+              <div className="flex justify-between text-sm font-mono">
+                <span className="text-foreground/60">Total After 1 Year:</span>
+                <span className="text-primary font-bold">
                   {projectedReturn} {selected.symbol}
                 </span>
               </div>
@@ -229,11 +307,16 @@ export function TokenVaultSelector() {
                 !depositAmount ||
                 Number.parseFloat(depositAmount) <
                   (selected?.minDeposit || 0) ||
-                isLoading
+                isLoading ||
+                isDepositing
               }
               className="w-full"
             >
-              {isLoading ? "LOADING..." : "[DEPOSIT TO VAULT]"}
+              {isDepositing
+                ? "PROCESSING..."
+                : isLoading
+                ? "LOADING..."
+                : "[DEPOSIT TO VAULT]"}
             </Button>
           </>
         )}
@@ -242,12 +325,15 @@ export function TokenVaultSelector() {
       {selected && (
         <InvestConfirmationModal
           isOpen={showConfirmation}
-          onClose={() => setShowConfirmation(false)}
+          onClose={() => {
+            setShowConfirmation(false);
+          }}
           onConfirm={handleConfirmDeposit}
           strategy={`${selected.name} (${selected.symbol})`}
-          amount={depositAmount}
+          amount={confirmationDetails.amount}
+          symbol={confirmationDetails.symbol}
           apy={selected.apy || 0}
-          projectedReturn={projectedReturn}
+          projectedReturn={confirmationDetails.projectedReturn}
           lockPeriod="Flexible"
           riskLevel="Low"
         />

@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,19 +8,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { SuccessModal } from "@/components/success-modal"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { SuccessModal } from "@/components/success-modal";
 
 interface StakeConfirmationModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onConfirm: () => void
-  token: string
-  amount: string
-  apy: number
-  dailyRewards: string
-  unstakeCooldown: string
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => Promise<{ success: boolean; txHash?: string }>;
+  token: string;
+  amount: string;
+  apy: number;
+  dailyRewards: string;
+  unstakeCooldown: string;
 }
 
 export function StakeConfirmationModal({
@@ -33,30 +33,40 @@ export function StakeConfirmationModal({
   dailyRewards,
   unstakeCooldown,
 }: StakeConfirmationModalProps) {
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [showSuccess, setShowSuccess] = useState(false)
-  const [transactionHash] = useState(`0x${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}`)
-  const explorerUrl = `https://etherscan.io/tx/${transactionHash}`
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [transactionHash, setTransactionHash] = useState("");
 
   const handleConfirm = async () => {
-    setIsProcessing(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setShowSuccess(true)
-    setIsProcessing(false)
-  }
+    setIsProcessing(true);
+    try {
+      // Call the actual stake function from parent
+      const result = await onConfirm();
+      if (result.success && result.txHash) {
+        setTransactionHash(result.txHash);
+        setShowSuccess(true);
+      }
+    } catch (error) {
+      console.error("Error in confirmation:", error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleSuccessClose = () => {
-    setShowSuccess(false)
-    onConfirm()
-    onClose()
-  }
+    setShowSuccess(false);
+    setTransactionHash("");
+    onClose();
+  };
 
   return (
     <>
       <Dialog open={isOpen && !showSuccess} onOpenChange={onClose}>
         <DialogContent className="border border-border bg-background max-w-md [clip-path:polygon(0_0,calc(100%_-_16px)_0,100%_0,100%_calc(100%_-_16px),calc(100%_-_16px)_100%,0_100%,0_16px)]">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-sentient">[CONFIRM STAKE]</DialogTitle>
+            <DialogTitle className="text-2xl font-sentient">
+              [CONFIRM STAKE]
+            </DialogTitle>
             <DialogDescription className="text-foreground/60 font-mono text-sm">
               Review the staking details before proceeding
             </DialogDescription>
@@ -66,7 +76,9 @@ export function StakeConfirmationModal({
           <div className="space-y-4 py-6 border-y border-border">
             {/* Stake Amount */}
             <div className="flex justify-between items-center">
-              <span className="text-sm font-mono text-foreground/60">STAKE AMOUNT</span>
+              <span className="text-sm font-mono text-foreground/60">
+                STAKE AMOUNT
+              </span>
               <div className="text-right">
                 <p className="text-lg font-sentient text-primary">
                   {amount} {token}
@@ -77,21 +89,31 @@ export function StakeConfirmationModal({
             {/* APY */}
             <div className="flex justify-between items-center py-3 border-y border-border/50">
               <span className="text-sm font-mono text-foreground/60">APY</span>
-              <span className="text-sm font-mono text-primary font-bold">{apy}%</span>
+              <span className="text-sm font-mono text-primary font-bold">
+                {apy}%
+              </span>
             </div>
 
             {/* Daily Rewards */}
             <div className="flex justify-between items-center">
-              <span className="text-sm font-mono text-foreground/60">DAILY REWARDS</span>
+              <span className="text-sm font-mono text-foreground/60">
+                DAILY REWARDS
+              </span>
               <div className="text-right">
-                <p className="text-lg font-sentient text-primary">{dailyRewards}</p>
+                <p className="text-lg font-sentient text-primary">
+                  {dailyRewards}
+                </p>
               </div>
             </div>
 
             {/* Unstake Cooldown */}
             <div className="flex justify-between items-center pt-3 border-t border-border/50">
-              <span className="text-sm font-mono text-foreground/60">UNSTAKE COOLDOWN</span>
-              <span className="text-sm font-mono text-foreground">{unstakeCooldown}</span>
+              <span className="text-sm font-mono text-foreground/60">
+                UNSTAKE COOLDOWN
+              </span>
+              <span className="text-sm font-mono text-foreground">
+                {unstakeCooldown}
+              </span>
             </div>
           </div>
 
@@ -104,7 +126,11 @@ export function StakeConfirmationModal({
             >
               [CANCEL]
             </button>
-            <Button onClick={handleConfirm} disabled={isProcessing} className="flex-1">
+            <Button
+              onClick={handleConfirm}
+              disabled={isProcessing}
+              className="flex-1"
+            >
               {isProcessing ? "[PROCESSING...]" : "[CONFIRM STAKE]"}
             </Button>
           </DialogFooter>
@@ -115,17 +141,17 @@ export function StakeConfirmationModal({
         isOpen={showSuccess}
         onClose={handleSuccessClose}
         title="[STAKING CONFIRMED]"
-        message="Your tokens have been successfully staked"
+        message="Your tokens have been successfully staked on Hedera testnet"
         details={[
-          { label: "STAKE AMOUNT", value: `${amount} ${token}` },
+          { label: "STAKED", value: `${amount} ${token}` },
           { label: "APY", value: `${apy}%` },
           { label: "DAILY REWARDS", value: dailyRewards },
           { label: "UNSTAKE COOLDOWN", value: unstakeCooldown },
         ]}
         transactionHash={transactionHash}
-        explorerUrl={explorerUrl}
+        explorerUrl={`https://hashscan.io/testnet/transaction/${transactionHash}`}
         actionButtonText="[CONTINUE]"
       />
     </>
-  )
+  );
 }
