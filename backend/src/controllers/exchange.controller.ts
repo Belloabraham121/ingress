@@ -553,6 +553,339 @@ export const calculateSwapOutput = async (
 };
 
 /**
+ * Cash out Token → Naira immediately after deposit
+ * POST /api/exchange/cashout-token
+ * Body: { tokenAddress, amountSmallest, tokenDecimals }
+ */
+export const cashoutTokenToNaira = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    const { tokenAddress, amountSmallest, tokenDecimals } = req.body;
+
+    console.log("[cashout] payload:", {
+      tokenAddress,
+      amountSmallest,
+      tokenDecimals,
+    });
+
+    if (!tokenAddress || !amountSmallest) {
+      res.status(400).json({
+        success: false,
+        message: "tokenAddress and amountSmallest are required",
+      });
+      return;
+    }
+
+    // Get wallet and user
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      res.status(404).json({ success: false, message: "Wallet not found" });
+      return;
+    }
+
+    const { User } = await import("../models/User");
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ success: false, message: "User not found" });
+      return;
+    }
+
+    // Bank account validation
+    const { BankAccount } = await import("../models/BankAccount");
+    const bankAccount = await BankAccount.findOne({ userId: user._id });
+    if (!bankAccount) {
+      res.status(400).json({
+        success: false,
+        message: "No bank account found. Link a bank account to cash out.",
+      });
+      return;
+    }
+
+    // Compute human amount and Naira value
+    const decimals = Number.isFinite(tokenDecimals)
+      ? Number(tokenDecimals)
+      : 18;
+    const humanAmount = Number(
+      ethers.formatUnits(BigInt(amountSmallest), decimals)
+    );
+
+    const { priceOracleService } = await import(
+      "../services/priceOracle.service"
+    );
+
+    // Determine token symbol for rate lookup
+    const addressToSymbol: Record<string, string> = {
+      [tokenAddress.toLowerCase()]: "TOKEN",
+    };
+    // Optional: map known addresses
+    // addressToSymbol[USDT_ADDRESS] = "USDT"; etc.
+
+    // Fallback to generic token→NGN conversion via calculateSwapOutput
+    const { exchangeService } = await import("../services/exchange.service");
+    const calc = await exchangeService.calculateSwapOutput(
+      tokenAddress,
+      "NGN",
+      humanAmount
+    );
+
+    const naira = calc.output;
+    const kobo = Math.round(naira * 100);
+
+    console.log("[cashout] computed:", {
+      humanAmount,
+      naira,
+      kobo,
+    });
+
+    // Ensure transfer recipient
+    const { paystackService } = await import("../services/paystack.service");
+
+    let recipientCode = bankAccount.recipientCode;
+    if (!recipientCode) {
+      console.log("[cashout] creating transfer recipient for:", {
+        name: `${user.firstName} ${user.lastName}`,
+        accountNumber: bankAccount.accountNumber,
+        bankCode: bankAccount.bankCode,
+      });
+      const recipient = await paystackService.createTransferRecipient(
+        `${user.firstName} ${user.lastName}`,
+        bankAccount.accountNumber,
+        bankAccount.bankCode
+      );
+      if (!recipient.status) {
+        res.status(400).json({
+          success: false,
+          message: recipient.message || "Failed to create transfer recipient",
+        });
+        return;
+      }
+      recipientCode = recipient.data.recipient_code;
+      bankAccount.recipientCode = recipientCode;
+      await bankAccount.save();
+    }
+
+    // Initiate transfer
+    console.log("[cashout] initiating transfer:", { kobo, recipientCode });
+    const transfer = await paystackService.initiateTransfer(
+      recipientCode as string,
+      kobo,
+      `Cashout: ${humanAmount} tokens`
+    );
+    if (!transfer.status) {
+      res.status(400).json({
+        success: false,
+        message: transfer.message || "Failed to initiate transfer",
+      });
+      return;
+    }
+
+    // Log activity
+    try {
+      await activityService.createActivity({
+        userId,
+        activityType: "swap",
+        amount: humanAmount.toString(),
+        fromToken: tokenAddress,
+        toToken: "NGN",
+        transactionHash: transfer.data.transfer_code,
+        status: "success",
+        metadata: {
+          direction: "token_to_naira",
+          nairaAmount: naira.toString(),
+          kobo,
+        },
+      });
+    } catch {}
+
+    res.status(200).json({
+      success: true,
+      message: "Cashout initiated",
+      data: {
+        transferCode: transfer.data.transfer_code,
+        naira,
+      },
+    });
+  } catch (error: any) {
+    console.error("[cashout] error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Direct Token → Token swap (no PayStack). Assumes user has deposited the fromToken.
+ * POST /api/exchange/swap-token-token
+ */
+export const swapTokenToToken = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    const {
+      fromTokenAddress,
+      toTokenAddress,
+      fromAmountSmallest, // string
+      fromTokenDecimals,
+      toTokenDecimals,
+    } = req.body;
+
+    console.log("[swapTokenToToken] incoming payload:", {
+      fromTokenAddress,
+      toTokenAddress,
+      fromAmountSmallest,
+      fromTokenDecimals,
+      toTokenDecimals,
+    });
+
+    if (!fromTokenAddress || !toTokenAddress || !fromAmountSmallest) {
+      res.status(400).json({
+        success: false,
+        message:
+          "fromTokenAddress, toTokenAddress and fromAmountSmallest are required",
+      });
+      return;
+    }
+
+    // Get user's wallet
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      res.status(404).json({ success: false, message: "Wallet not found" });
+      return;
+    }
+
+    const evmAddress = await getEvmAddressFromAccountId(wallet.accountId);
+    console.log("[swapTokenToToken] user accountId → evm:", {
+      accountId: wallet.accountId,
+      evmAddress,
+    });
+
+    // Calculate output via exchange service
+    const { exchangeService } = await import("../services/exchange.service");
+
+    const decimalsFrom = Number.isFinite(fromTokenDecimals)
+      ? Number(fromTokenDecimals)
+      : 18;
+    const decimalsTo = Number.isFinite(toTokenDecimals)
+      ? Number(toTokenDecimals)
+      : 18;
+
+    const humanFromAmount = Number(
+      ethers.formatUnits(BigInt(fromAmountSmallest), decimalsFrom)
+    );
+    console.log("[swapTokenToToken] humanFromAmount:", humanFromAmount);
+
+    const calc = await exchangeService.calculateSwapOutput(
+      fromTokenAddress,
+      toTokenAddress,
+      humanFromAmount
+    );
+    console.log("[swapTokenToToken] calculated output:", calc);
+
+    const toAmountSmallest = ethers.parseUnits(
+      calc.output.toFixed(decimalsTo),
+      decimalsTo
+    );
+    console.log(
+      "[swapTokenToToken] toAmountSmallest:",
+      toAmountSmallest.toString()
+    );
+
+    // Validate admin credentials
+    if (!process.env.ADMIN_ACCOUNT_ID || !process.env.ADMIN_PRIVATE_KEY) {
+      res.status(500).json({
+        success: false,
+        message:
+          "Server misconfiguration: ADMIN_ACCOUNT_ID/ADMIN_PRIVATE_KEY not set",
+      });
+      return;
+    }
+
+    // Execute transferToUser via Hedera SDK (admin)
+    const client = Client.forTestnet();
+    const adminAccountId = AccountId.fromString(process.env.ADMIN_ACCOUNT_ID);
+    const adminPrivateKey = PrivateKey.fromStringECDSA(
+      process.env.ADMIN_PRIVATE_KEY
+    );
+    client.setOperator(adminAccountId, adminPrivateKey);
+    console.log("[swapTokenToToken] admin:", {
+      adminAccountId: adminAccountId.toString(),
+      exchangeContract: process.env.EXCHANGE_CONTRACT,
+    });
+
+    const exchangeAddress =
+      process.env.EXCHANGE_CONTRACT ||
+      "0x1938C3345f2B6B2Fa3538713DB50f80ebA3a61d5";
+    const exchangeContractId = evmAddressToContractId(exchangeAddress);
+
+    const iface = new ethers.Interface([
+      "function transferToUser(address token, address to, uint256 amount)",
+    ]);
+    const callData = iface.encodeFunctionData("transferToUser", [
+      toTokenAddress,
+      evmAddress,
+      toAmountSmallest,
+    ]);
+
+    const tx = new ContractExecuteTransaction()
+      .setContractId(exchangeContractId)
+      .setGas(800000)
+      .setFunctionParameters(Buffer.from(callData.slice(2), "hex"));
+
+    const txResp = await tx.execute(client);
+    const receipt = await txResp.getReceipt(client);
+    console.log("[swapTokenToToken] tx sent:", {
+      txId: txResp.transactionId.toString(),
+      status: receipt.status.toString(),
+    });
+
+    // Log activity
+    try {
+      await activityService.createActivity({
+        userId,
+        activityType: "swap",
+        amount: calc.output.toString(),
+        fromToken: fromTokenAddress,
+        toToken: toTokenAddress,
+        transactionHash: txResp.transactionId.toString(),
+        status: receipt.status.toString() === "SUCCESS" ? "success" : "failed",
+        metadata: {
+          direction: "token_to_token",
+          fromAmount: humanFromAmount.toString(),
+        },
+      });
+    } catch {}
+
+    res.status(200).json({
+      success: true,
+      message: "Swap executed",
+      data: {
+        transactionHash: txResp.transactionId.toString(),
+        amountOut: calc.output,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error swapping token to token:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to swap token to token",
+    });
+  }
+};
+
+/**
  * Initiate Naira to Token payment
  * POST /api/exchange/initiate-payment
  */
@@ -613,7 +946,7 @@ export const initiateNairaToTokenPayment = async (
 
     // Initialize PayStack transaction
     const { paystackService } = await import("../services/paystack.service");
-    const amountInKobo = nairaAmount * 100;
+    const amountInKobo = Math.round(nairaAmount * 100);
 
     const metadata = {
       exchangeType,

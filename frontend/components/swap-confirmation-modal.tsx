@@ -1,6 +1,6 @@
-"use client"
+"use client";
 
-import { useState } from "react"
+import { useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -8,19 +8,19 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { SuccessModal } from "@/components/success-modal"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { SuccessModal } from "@/components/success-modal";
 
 interface SwapConfirmationModalProps {
-  isOpen: boolean
-  onClose: () => void
-  onConfirm: () => void
-  fromAmount: string
-  fromCurrency: string
-  toAmount: string
-  toCurrency: string
-  exchangeRate: string
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => Promise<{ success: boolean; transactionHash?: string }>;
+  fromAmount: string;
+  fromCurrency: string;
+  toAmount: string;
+  toCurrency: string;
+  exchangeRate: string;
 }
 
 export function SwapConfirmationModal({
@@ -33,31 +33,42 @@ export function SwapConfirmationModal({
   toCurrency,
   exchangeRate,
 }: SwapConfirmationModalProps) {
-  const [isProcessing, setIsProcessing] = useState(false)
-  const [showSuccess, setShowSuccess] = useState(false)
-  const [transactionHash] = useState(`0x${Math.random().toString(16).slice(2)}${Math.random().toString(16).slice(2)}`)
-  const explorerUrl = `https://etherscan.io/tx/${transactionHash}`
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [transactionHash, setTransactionHash] = useState("");
+  const explorerUrl = transactionHash
+    ? `https://hashscan.io/testnet/transaction/${transactionHash}`
+    : "";
 
   const handleConfirm = async () => {
-    setIsProcessing(true)
-    // Simulate processing
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setShowSuccess(true)
-    setIsProcessing(false)
-  }
+    setIsProcessing(true);
+    try {
+      const result = await onConfirm();
+      if (result.success && result.transactionHash) {
+        setTransactionHash(result.transactionHash);
+        setShowSuccess(true);
+      }
+    } catch (error) {
+      console.error("Error confirming swap:", error);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleSuccessClose = () => {
-    setShowSuccess(false)
-    onConfirm()
-    onClose()
-  }
+    setShowSuccess(false);
+    setTransactionHash("");
+    onClose();
+  };
 
   return (
     <>
       <Dialog open={isOpen && !showSuccess} onOpenChange={onClose}>
-        <DialogContent className="border border-border bg-background max-w-md [clip-path:polygon(0_0,calc(100%_-_16px)_0,100%_0,100%_calc(100%_-_16px),calc(100%_-_16px)_100%,0_100%,0_16px)]">
+        <DialogContent className="border border-border bg-background max-w-md [clip-path:polygon(0_0,calc(100%-16px)_0,100%_0,100%_calc(100%-16px),calc(100%-16px)_100%,0_100%,0_16px)]">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-sentient">[CONFIRM SWAP]</DialogTitle>
+            <DialogTitle className="text-2xl font-sentient">
+              [CONFIRM SWAP]
+            </DialogTitle>
             <DialogDescription className="text-foreground/60 font-mono text-sm">
               Review the transaction details before proceeding
             </DialogDescription>
@@ -77,13 +88,19 @@ export function SwapConfirmationModal({
 
             {/* Exchange Rate */}
             <div className="flex justify-between items-center py-3 border-y border-border/50">
-              <span className="text-sm font-mono text-foreground/60">EXCHANGE RATE</span>
-              <span className="text-sm font-mono text-foreground">{exchangeRate}</span>
+              <span className="text-sm font-mono text-foreground/60">
+                EXCHANGE RATE
+              </span>
+              <span className="text-sm font-mono text-foreground">
+                {exchangeRate}
+              </span>
             </div>
 
             {/* To Amount */}
             <div className="flex justify-between items-center">
-              <span className="text-sm font-mono text-foreground/60">YOU WILL RECEIVE</span>
+              <span className="text-sm font-mono text-foreground/60">
+                YOU WILL RECEIVE
+              </span>
               <div className="text-right">
                 <p className="text-lg font-sentient text-primary">
                   {toAmount} {toCurrency}
@@ -93,7 +110,9 @@ export function SwapConfirmationModal({
 
             {/* Fee Info */}
             <div className="flex justify-between items-center pt-3 border-t border-border/50">
-              <span className="text-sm font-mono text-foreground/60">TRANSACTION FEE</span>
+              <span className="text-sm font-mono text-foreground/60">
+                TRANSACTION FEE
+              </span>
               <span className="text-sm font-mono text-foreground/50">0.5%</span>
             </div>
           </div>
@@ -107,7 +126,11 @@ export function SwapConfirmationModal({
             >
               [CANCEL]
             </button>
-            <Button onClick={handleConfirm} disabled={isProcessing} className="flex-1">
+            <Button
+              onClick={handleConfirm}
+              disabled={isProcessing}
+              className="flex-1"
+            >
               {isProcessing ? "[PROCESSING...]" : "[CONFIRM SWAP]"}
             </Button>
           </DialogFooter>
@@ -129,5 +152,5 @@ export function SwapConfirmationModal({
         actionButtonText="[CONTINUE]"
       />
     </>
-  )
+  );
 }
