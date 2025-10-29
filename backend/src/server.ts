@@ -62,6 +62,10 @@ const startServer = async () => {
     // Connect to database
     await connectDatabase();
 
+    // Start Exchange event listeners
+    const { exchangeService } = await import("./services/exchange.service");
+    exchangeService.startEventListeners().catch(console.error);
+
     // Start listening
     const PORT = env.PORT || 3000;
     app.listen(PORT, () => {

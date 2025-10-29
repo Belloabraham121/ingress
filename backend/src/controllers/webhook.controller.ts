@@ -206,14 +206,54 @@ async function handleChargeSuccess(data: any): Promise<void> {
       metadata,
     });
 
-    // Update bank account balance
-    bankAccount.balance += amount / 100;
-    await bankAccount.save();
+    // Check if this is an exchange payment (Naira → Token/HBAR)
+    if (metadata?.exchangeType && metadata?.walletAddress) {
+      console.log("📊 Exchange payment detected!");
+      const { exchangeService } = await import("../services/exchange.service");
 
-    console.log(
-      `✅ Transaction saved and balance updated for account: ${bankAccount.accountNumber}`
-    );
-    console.log(`New balance: ${bankAccount.balance} ${currency}`);
+      const nairaAmount = amount / 100; // Convert from kobo to naira
+      const { exchangeType, tokenAddress, walletAddress } = metadata;
+
+      if (exchangeType === "naira_to_token" && tokenAddress) {
+        // Naira → Token
+        const success = await exchangeService.handleNairaToToken(
+          walletAddress,
+          bankAccount.userId.toString(),
+          tokenAddress,
+          nairaAmount,
+          reference
+        );
+
+        if (success) {
+          console.log("✅ Token sent to user successfully!");
+        } else {
+          console.error("❌ Failed to send token to user");
+        }
+      } else if (exchangeType === "naira_to_hbar") {
+        // Naira → HBAR
+        const success = await exchangeService.handleNairaToHbar(
+          walletAddress,
+          bankAccount.userId.toString(),
+          nairaAmount,
+          reference
+        );
+
+        if (success) {
+          console.log("✅ HBAR sent to user successfully!");
+        } else {
+          console.error("❌ Failed to send HBAR to user");
+        }
+      }
+    } else {
+      // Regular deposit to bank account balance
+      bankAccount.balance += amount / 100;
+      await bankAccount.save();
+
+      console.log(
+        `✅ Transaction saved and balance updated for account: ${bankAccount.accountNumber}`
+      );
+      console.log(`New balance: ${bankAccount.balance} ${currency}`);
+    }
   } catch (error) {
     console.error("Error handling charge success:", error);
   }

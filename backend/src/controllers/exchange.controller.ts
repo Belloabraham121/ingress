@@ -480,3 +480,175 @@ export const getExchangeBalance = async (
     });
   }
 };
+
+/**
+ * Get exchange rates
+ * GET /api/exchange/rates
+ */
+export const getExchangeRates = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { exchangeService } = await import("../services/exchange.service");
+    const rates = await exchangeService.getExchangeRates();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        rates,
+        tokens: {
+          usdc: "0x125D3f690f281659Dd7708D21688BC83Ee534aE6",
+          usdt: "0xd4E61131Ed9C3dd610727655aE8254B286deE95c",
+          dai: "0x3814F5Cf6c4Aa63EdDF8A79c82346a163c7E7C53",
+        },
+      },
+    });
+  } catch (error: any) {
+    console.error("Error getting exchange rates:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to get exchange rates",
+    });
+  }
+};
+
+/**
+ * Calculate swap output
+ * POST /api/exchange/calculate
+ */
+export const calculateSwapOutput = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const { fromToken, toToken, amount } = req.body;
+
+    if (!fromToken || !toToken || !amount) {
+      res.status(400).json({
+        success: false,
+        message: "fromToken, toToken, and amount are required",
+      });
+      return;
+    }
+
+    const { exchangeService } = await import("../services/exchange.service");
+    const result = await exchangeService.calculateSwapOutput(
+      fromToken,
+      toToken,
+      amount
+    );
+
+    res.status(200).json({
+      success: true,
+      data: result,
+    });
+  } catch (error: any) {
+    console.error("Error calculating swap output:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to calculate swap output",
+    });
+  }
+};
+
+/**
+ * Initiate Naira to Token payment
+ * POST /api/exchange/initiate-payment
+ */
+export const initiateNairaToTokenPayment = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+      return;
+    }
+
+    const { tokenAddress, nairaAmount, exchangeType } = req.body;
+
+    if (!nairaAmount || !exchangeType) {
+      res.status(400).json({
+        success: false,
+        message: "nairaAmount and exchangeType are required",
+      });
+      return;
+    }
+
+    if (exchangeType === "naira_to_token" && !tokenAddress) {
+      res.status(400).json({
+        success: false,
+        message: "tokenAddress is required for naira_to_token exchange",
+      });
+      return;
+    }
+
+    // Get user's wallet
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      res.status(404).json({
+        success: false,
+        message: "Wallet not found",
+      });
+      return;
+    }
+
+    const evmAddress = await getEvmAddressFromAccountId(wallet.accountId);
+
+    // Get user details
+    const { User } = await import("../models/User");
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+      return;
+    }
+
+    // Initialize PayStack transaction
+    const { paystackService } = await import("../services/paystack.service");
+    const amountInKobo = nairaAmount * 100;
+
+    const metadata = {
+      exchangeType,
+      walletAddress: evmAddress,
+      ...(tokenAddress && { tokenAddress }),
+    };
+
+    const paymentResult = await paystackService.initializeTransaction(
+      user.email,
+      amountInKobo,
+      "NGN",
+      metadata
+    );
+
+    if (paymentResult.status) {
+      res.status(200).json({
+        success: true,
+        message: "Payment initialized successfully",
+        data: {
+          authorizationUrl: paymentResult.data.authorization_url,
+          accessCode: paymentResult.data.access_code,
+          reference: paymentResult.data.reference,
+        },
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: paymentResult.message || "Failed to initialize payment",
+      });
+    }
+  } catch (error: any) {
+    console.error("Error initiating payment:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to initiate payment",
+    });
+  }
+};
