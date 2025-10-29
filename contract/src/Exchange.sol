@@ -7,11 +7,11 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
- * @title TestVault
- * @dev A test contract that allows users to deposit ERC20 tokens and HBAR,
+ * @title Exchange
+ * @dev A contract that allows users to deposit ERC20 tokens and HBAR,
  *      with controlled withdrawal functionality restricted to authorized users
  */
-contract TestVault is ReentrancyGuard, Ownable {
+contract Exchange is ReentrancyGuard, Ownable {
     using SafeERC20 for IERC20;
 
     // State variables
@@ -171,21 +171,25 @@ contract TestVault is ReentrancyGuard, Ownable {
      * @param to The recipient address
      * @param amount The amount to transfer
      */
-    function transferToUser(address token, address to, uint256 amount) external nonReentrant {
+    function transferToUser(
+        address token,
+        address to,
+        uint256 amount
+    ) external nonReentrant {
         if (msg.sender != owner() && msg.sender != authorizedWithdrawer) {
             revert UnauthorizedWithdrawal();
         }
         if (token == address(0)) revert InvalidToken();
         if (to == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
-        
+
         IERC20 tokenContract = IERC20(token);
         uint256 contractBalance = tokenContract.balanceOf(address(this));
         if (contractBalance < amount) revert InsufficientBalance();
-        
+
         bool success = tokenContract.transfer(to, amount);
         if (!success) revert TransferFailed();
-        
+
         emit TokenWithdrawn(to, token, amount, msg.sender);
     }
 
@@ -194,17 +198,20 @@ contract TestVault is ReentrancyGuard, Ownable {
      * @param to The recipient address
      * @param amount The amount to transfer
      */
-    function transferHbarToUser(address payable to, uint256 amount) external nonReentrant {
+    function transferHbarToUser(
+        address payable to,
+        uint256 amount
+    ) external nonReentrant {
         if (msg.sender != owner() && msg.sender != authorizedWithdrawer) {
             revert UnauthorizedWithdrawal();
         }
         if (to == address(0)) revert InvalidAddress();
         if (amount == 0) revert InvalidAmount();
         if (address(this).balance < amount) revert InsufficientBalance();
-        
+
         (bool success, ) = to.call{value: amount}("");
         if (!success) revert TransferFailed();
-        
+
         emit HbarWithdrawn(to, amount, msg.sender);
     }
 
@@ -212,12 +219,14 @@ contract TestVault is ReentrancyGuard, Ownable {
      * @notice Update the authorized withdrawer address
      * @param newWithdrawer The new authorized withdrawer address
      */
-    function updateAuthorizedWithdrawer(address newWithdrawer) external onlyOwner {
+    function updateAuthorizedWithdrawer(
+        address newWithdrawer
+    ) external onlyOwner {
         if (newWithdrawer == address(0)) revert InvalidAddress();
-        
+
         address oldWithdrawer = authorizedWithdrawer;
         authorizedWithdrawer = newWithdrawer;
-        
+
         emit AuthorizedWithdrawerUpdated(oldWithdrawer, newWithdrawer);
     }
 

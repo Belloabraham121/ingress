@@ -182,3 +182,48 @@ export interface RefreshBalanceResponse {
   transactionsSaved: number;
   currency: string;
 }
+
+// Activity Types
+export interface Activity {
+  _id: string;
+  userId: string;
+  activityType:
+    | "swap"
+    | "invest"
+    | "stake"
+    | "withdraw_vault"
+    | "withdraw_stake";
+  amount: string;
+  tokenSymbol?: string;
+  fromToken?: string;
+  toToken?: string;
+  vaultName?: string;
+  vaultAddress?: string;
+  poolName?: string;
+  poolId?: number;
+  stakingPoolAddress?: string;
+  transactionHash: string;
+  status: "success" | "failed" | "pending";
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaginatedActivities {
+  activities: Activity[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalItems: number;
+    itemsPerPage: number;
+    hasNextPage: boolean;
+    hasPreviousPage: boolean;
+  };
+}
+
+export interface ActivityStats {
+  totalActivities: number;
+  totalSwaps: number;
+  totalInvestments: number;
+  totalStakes: number;
+}

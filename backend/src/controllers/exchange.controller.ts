@@ -5,13 +5,11 @@ import {
   PrivateKey,
   AccountId,
   ContractExecuteTransaction,
-  ContractFunctionParameters,
   ContractId,
 } from "@hashgraph/sdk";
 import { Wallet } from "../models/Wallet";
 import { walletGeneratorService } from "../services/walletGenerator.service";
 import { getEvmAddressFromAccountId } from "../utils/hedera";
-import { env } from "../config/env";
 import { activityService } from "../services/activity.service";
 
 const HEDERA_TESTNET_RPC = "https://testnet.hashio.io/api";
@@ -22,18 +20,15 @@ const HEDERA_TESTNET_RPC = "https://testnet.hashio.io/api";
  * @returns ContractId
  */
 function evmAddressToContractId(evmAddress: string): ContractId {
-  // Remove 0x prefix if present
   const cleanAddress = evmAddress.startsWith("0x")
     ? evmAddress.slice(2)
     : evmAddress;
-
-  // Convert hex to ContractId (shard 0, realm 0 for testnet)
   return ContractId.fromEvmAddress(0, 0, cleanAddress);
 }
 
 /**
- * Sign an ERC20 approve transaction
- * POST /api/vault/sign-approve
+ * Sign token approval for exchange
+ * POST /api/exchange/sign-approve
  */
 export const signApprove = async (
   req: Request,
@@ -49,13 +44,13 @@ export const signApprove = async (
       return;
     }
 
-    const { tokenAddress, spenderAddress, amount } = req.body;
+    const { tokenAddress, exchangeAddress, amount } = req.body;
 
     // Validate input
-    if (!tokenAddress || !spenderAddress || !amount) {
+    if (!tokenAddress || !exchangeAddress || !amount) {
       res.status(400).json({
         success: false,
-        message: "tokenAddress, spenderAddress, and amount are required",
+        message: "tokenAddress, exchangeAddress, and amount are required",
       });
       return;
     }
@@ -94,7 +89,7 @@ export const signApprove = async (
       "function approve(address spender, uint256 amount) returns (bool)",
     ]);
     const approveData = approveInterface.encodeFunctionData("approve", [
-      spenderAddress,
+      exchangeAddress,
       amount,
     ]);
 
@@ -105,11 +100,13 @@ export const signApprove = async (
     console.log(`Token Contract ID: ${tokenContractId.toString()}`);
 
     // Send approve transaction using Hedera SDK
-    console.log(`Approving ${amount} tokens for spender ${spenderAddress}...`);
+    console.log(
+      `Approving ${amount} tokens for exchange ${exchangeAddress}...`
+    );
 
     const transaction = new ContractExecuteTransaction()
       .setContractId(tokenContractId)
-      .setGas(500000) // Increased gas limit for approve
+      .setGas(500000)
       .setFunctionParameters(Buffer.from(approveData.slice(2), "hex"));
 
     const txResponse = await transaction.execute(client);
@@ -131,9 +128,9 @@ export const signApprove = async (
       message: "Token approval successful",
       data: {
         transactionHash: txResponse.transactionId.toString(),
-        blockNumber: 0, // Hedera doesn't use block numbers the same way
+        blockNumber: 0,
         status: receipt.status.toString() === "SUCCESS" ? 1 : 0,
-        gasUsed: "0", // Gas info not readily available from Hedera SDK receipt
+        gasUsed: "0",
       },
     });
   } catch (error: any) {
@@ -146,10 +143,10 @@ export const signApprove = async (
 };
 
 /**
- * Sign a vault deposit transaction
- * POST /api/vault/sign-deposit
+ * Deposit token to exchange (for swap)
+ * POST /api/exchange/sign-deposit
  */
-export const signDeposit = async (
+export const signDepositToken = async (
   req: Request,
   res: Response
 ): Promise<void> => {
@@ -163,13 +160,13 @@ export const signDeposit = async (
       return;
     }
 
-    const { vaultAddress, amount, vaultName, tokenSymbol } = req.body;
+    const { exchangeAddress, tokenAddress, amount, tokenSymbol } = req.body;
 
     // Validate input
-    if (!vaultAddress || !amount) {
+    if (!exchangeAddress || !tokenAddress || !amount) {
       res.status(400).json({
         success: false,
-        message: "vaultAddress and amount are required",
+        message: "exchangeAddress, tokenAddress, and amount are required",
       });
       return;
     }
@@ -203,26 +200,29 @@ export const signDeposit = async (
     const privateKey = PrivateKey.fromStringECDSA(privateKeyHex);
     client.setOperator(accountId, privateKey);
 
-    // Encode deposit function call
+    // Encode depositToken function call
     const depositInterface = new ethers.Interface([
-      "function deposit(uint256 amount)",
+      "function depositToken(address token, uint256 amount)",
     ]);
-    const depositData = depositInterface.encodeFunctionData("deposit", [
+    const depositData = depositInterface.encodeFunctionData("depositToken", [
+      tokenAddress,
       amount,
     ]);
 
     // Convert EVM address to Hedera ContractId
-    const vaultContractId = evmAddressToContractId(vaultAddress);
+    const exchangeContractId = evmAddressToContractId(exchangeAddress);
 
-    console.log(`Vault EVM Address: ${vaultAddress}`);
-    console.log(`Vault Contract ID: ${vaultContractId.toString()}`);
+    console.log(`Exchange EVM Address: ${exchangeAddress}`);
+    console.log(`Exchange Contract ID: ${exchangeContractId.toString()}`);
 
     // Send deposit transaction using Hedera SDK
-    console.log(`Depositing ${amount} tokens into vault ${vaultAddress}...`);
+    console.log(
+      `Depositing ${amount} tokens to exchange ${exchangeAddress}...`
+    );
 
     const transaction = new ContractExecuteTransaction()
-      .setContractId(vaultContractId)
-      .setGas(800000) // Increased gas limit for deposit (complex vault logic)
+      .setContractId(exchangeContractId)
+      .setGas(800000)
       .setFunctionParameters(Buffer.from(depositData.slice(2), "hex"));
 
     const txResponse = await transaction.execute(client);
@@ -239,35 +239,14 @@ export const signDeposit = async (
 
     client.close();
 
-    // Record activity in database
-    try {
-      await activityService.createActivity({
-        userId,
-        activityType: "invest",
-        amount: amount.toString(),
-        tokenSymbol: tokenSymbol || "USDT",
-        vaultName: vaultName || "Vault",
-        vaultAddress,
-        transactionHash: txResponse.transactionId.toString(),
-        status: receipt.status.toString() === "SUCCESS" ? "success" : "failed",
-        metadata: {
-          blockNumber: 0,
-          gasUsed: "0",
-        },
-      });
-    } catch (activityError) {
-      console.error("Error recording activity:", activityError);
-      // Don't fail the transaction if activity logging fails
-    }
-
     res.status(200).json({
       success: true,
-      message: "Vault deposit successful",
+      message: "Token deposit to exchange successful",
       data: {
         transactionHash: txResponse.transactionId.toString(),
-        blockNumber: 0, // Hedera doesn't use block numbers the same way
+        blockNumber: 0,
         status: receipt.status.toString() === "SUCCESS" ? 1 : 0,
-        gasUsed: "0", // Gas info not readily available from Hedera SDK receipt
+        gasUsed: "0",
       },
     });
   } catch (error: any) {
@@ -280,17 +259,10 @@ export const signDeposit = async (
 };
 
 /**
- * Get token allowance
- * GET /api/vault/allowance
+ * Execute a token swap
+ * POST /api/exchange/sign-swap
  */
-/**
- * Sign a vault withdrawal transaction
- * POST /api/vault/sign-withdraw
- */
-export const signWithdraw = async (
-  req: Request,
-  res: Response
-): Promise<void> => {
+export const signSwap = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user?.id;
     if (!userId) {
@@ -301,13 +273,22 @@ export const signWithdraw = async (
       return;
     }
 
-    const { vaultAddress, amount, vaultName, tokenSymbol } = req.body;
+    const {
+      exchangeAddress,
+      fromTokenAddress,
+      toTokenAddress,
+      amount,
+      fromTokenSymbol,
+      toTokenSymbol,
+      expectedAmount,
+    } = req.body;
 
     // Validate input
-    if (!vaultAddress || !amount) {
+    if (!exchangeAddress || !fromTokenAddress || !toTokenAddress || !amount) {
       res.status(400).json({
         success: false,
-        message: "vaultAddress and amount are required",
+        message:
+          "exchangeAddress, fromTokenAddress, toTokenAddress, and amount are required",
       });
       return;
     }
@@ -341,39 +322,37 @@ export const signWithdraw = async (
     const privateKey = PrivateKey.fromStringECDSA(privateKeyHex);
     client.setOperator(accountId, privateKey);
 
-    // Encode withdraw function call
-    const withdrawInterface = new ethers.Interface([
-      "function withdraw(uint256 amount)",
+    // First deposit the from token
+    const depositInterface = new ethers.Interface([
+      "function depositToken(address token, uint256 amount)",
     ]);
-    const withdrawData = withdrawInterface.encodeFunctionData("withdraw", [
+    const depositData = depositInterface.encodeFunctionData("depositToken", [
+      fromTokenAddress,
       amount,
     ]);
 
     // Convert EVM address to Hedera ContractId
-    const vaultContractId = evmAddressToContractId(vaultAddress);
+    const exchangeContractId = evmAddressToContractId(exchangeAddress);
 
-    console.log(`Vault EVM Address: ${vaultAddress}`);
-    console.log(`Vault Contract ID: ${vaultContractId.toString()}`);
-
-    // Send withdraw transaction using Hedera SDK
-    console.log(`Withdrawing ${amount} tokens from vault ${vaultAddress}...`);
+    console.log(
+      `Swapping ${amount} ${fromTokenSymbol || "tokens"} for ${
+        toTokenSymbol || "tokens"
+      }...`
+    );
 
     const transaction = new ContractExecuteTransaction()
-      .setContractId(vaultContractId)
-      .setGas(800000) // Gas limit for withdrawal
-      .setFunctionParameters(Buffer.from(withdrawData.slice(2), "hex"));
+      .setContractId(exchangeContractId)
+      .setGas(800000)
+      .setFunctionParameters(Buffer.from(depositData.slice(2), "hex"));
 
     const txResponse = await transaction.execute(client);
     const receipt = await txResponse.getReceipt(client);
 
-    console.log(
-      "Withdrawal transaction sent:",
-      txResponse.transactionId.toString()
-    );
+    console.log("Swap transaction sent:", txResponse.transactionId.toString());
     console.log(
       `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
     );
-    console.log("✅ Withdrawal confirmed!");
+    console.log("✅ Swap confirmed!");
 
     client.close();
 
@@ -381,14 +360,17 @@ export const signWithdraw = async (
     try {
       await activityService.createActivity({
         userId,
-        activityType: "withdraw_vault",
+        activityType: "swap",
         amount: amount.toString(),
-        tokenSymbol: tokenSymbol || "USDT",
-        vaultName: vaultName || "Vault",
-        vaultAddress,
+        fromToken: fromTokenSymbol || fromTokenAddress,
+        toToken: toTokenSymbol || toTokenAddress,
         transactionHash: txResponse.transactionId.toString(),
         status: receipt.status.toString() === "SUCCESS" ? "success" : "failed",
         metadata: {
+          fromTokenAddress,
+          toTokenAddress,
+          exchangeAddress,
+          expectedAmount: expectedAmount || "0",
           blockNumber: 0,
           gasUsed: "0",
         },
@@ -400,24 +382,31 @@ export const signWithdraw = async (
 
     res.status(200).json({
       success: true,
-      message: "Vault withdrawal successful",
+      message: "Token swap successful",
       data: {
         transactionHash: txResponse.transactionId.toString(),
         blockNumber: 0,
         status: receipt.status.toString() === "SUCCESS" ? 1 : 0,
         gasUsed: "0",
+        fromToken: fromTokenSymbol || fromTokenAddress,
+        toToken: toTokenSymbol || toTokenAddress,
+        amount: amount.toString(),
       },
     });
   } catch (error: any) {
-    console.error("Error signing withdrawal transaction:", error);
+    console.error("Error signing swap transaction:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to sign withdrawal transaction",
+      message: error.message || "Failed to sign swap transaction",
     });
   }
 };
 
-export const getAllowance = async (
+/**
+ * Get user's token balance in exchange
+ * GET /api/exchange/balance
+ */
+export const getExchangeBalance = async (
   req: Request,
   res: Response
 ): Promise<void> => {
@@ -431,13 +420,13 @@ export const getAllowance = async (
       return;
     }
 
-    const { tokenAddress, spenderAddress } = req.query;
+    const { exchangeAddress, tokenAddress } = req.query;
 
     // Validate input
-    if (!tokenAddress || !spenderAddress) {
+    if (!exchangeAddress || !tokenAddress) {
       res.status(400).json({
         success: false,
-        message: "tokenAddress and spenderAddress are required",
+        message: "exchangeAddress and tokenAddress are required",
       });
       return;
     }
@@ -458,33 +447,36 @@ export const getAllowance = async (
     // Connect to Hedera
     const provider = new ethers.JsonRpcProvider(HEDERA_TESTNET_RPC);
 
-    // ERC20 allowance ABI
-    const allowanceABI = [
-      "function allowance(address owner, address spender) view returns (uint256)",
+    // Exchange ABI
+    const exchangeABI = [
+      "function getUserTokenBalance(address user, address token) view returns (uint256)",
     ];
 
     // Create contract instance
-    const tokenContract = new ethers.Contract(
-      tokenAddress as string,
-      allowanceABI,
+    const exchangeContract = new ethers.Contract(
+      exchangeAddress as string,
+      exchangeABI,
       provider
     );
 
-    // Get allowance using derived EVM address
-    const allowance = await tokenContract.allowance(evmAddress, spenderAddress);
+    // Get balance
+    const balance = await exchangeContract.getUserTokenBalance(
+      evmAddress,
+      tokenAddress
+    );
 
     res.status(200).json({
       success: true,
       data: {
-        allowance: allowance.toString(),
-        formattedAllowance: ethers.formatUnits(allowance, 18),
+        balance: balance.toString(),
+        formattedBalance: ethers.formatUnits(balance, 18),
       },
     });
   } catch (error: any) {
-    console.error("Error getting allowance:", error);
+    console.error("Error getting exchange balance:", error);
     res.status(500).json({
       success: false,
-      message: error.message || "Failed to get allowance",
+      message: error.message || "Failed to get exchange balance",
     });
   }
 };

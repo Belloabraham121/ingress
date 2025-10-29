@@ -9,6 +9,8 @@ export interface StakeParams {
   tokenAddress: string;
   poolId: number;
   amount: string; // Amount in token units (will be converted to wei)
+  poolName?: string; // Pool name for activity tracking
+  tokenSymbol?: string; // Token symbol for activity tracking
   onSuccess?: (txHash: string) => void;
   onError?: (error: Error) => void;
 }
@@ -42,6 +44,8 @@ export function useStakingDeposit() {
     tokenAddress,
     poolId,
     amount,
+    poolName,
+    tokenSymbol,
     onSuccess,
     onError,
   }: StakeParams) => {
@@ -117,6 +121,8 @@ export function useStakingDeposit() {
         stakingPoolAddress,
         poolId,
         amount: amountWei.toString(),
+        poolName,
+        tokenSymbol,
       });
 
       console.log("✅ Stake successful!");
@@ -128,6 +134,11 @@ export function useStakingDeposit() {
       console.log("");
 
       setTxHash(stakeResponse.transactionHash);
+
+      // Dispatch event to refresh activity list
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("activityUpdated"));
+      }
 
       if (onSuccess) {
         onSuccess(stakeResponse.transactionHash);
@@ -169,4 +180,3 @@ export function useStakingDeposit() {
     setError,
   };
 }
-

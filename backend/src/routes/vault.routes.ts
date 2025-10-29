@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   signApprove,
   signDeposit,
+  signWithdraw,
   getAllowance,
 } from "../controllers/vault.controller";
 import { protect as authenticate } from "../middleware/auth.middleware";
@@ -21,6 +22,13 @@ router.post("/sign-approve", authenticate, signApprove);
  * @access  Private
  */
 router.post("/sign-deposit", authenticate, signDeposit);
+
+/**
+ * @route   POST /api/vault/sign-withdraw
+ * @desc    Sign a vault withdrawal transaction
+ * @access  Private
+ */
+router.post("/sign-withdraw", authenticate, signWithdraw);
 
 /**
  * @route   GET /api/vault/allowance

@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TokenVaultCard } from "@/components/token-vault-card";
 import { InvestConfirmationModal } from "@/components/invest-confirmation-modal";
+import { VaultWithdrawModal } from "@/components/vault-withdraw-modal";
 import { useVaults } from "@/hooks/useVaults";
 import { useVaultDeposit } from "@/hooks/useVaultDeposit";
+import { useVaultWithdraw } from "@/hooks/useVaultWithdraw";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, RefreshCw, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -30,10 +32,13 @@ interface TokenVault {
 export function TokenVaultSelector() {
   const { vaults, isLoading, error, refresh } = useVaults();
   const { deposit, isDepositing, error: depositError } = useVaultDeposit();
+  const { withdraw, isWithdrawing, error: withdrawError } = useVaultWithdraw();
   const { toast } = useToast();
   const [selectedVault, setSelectedVault] = useState<string>("");
   const [depositAmount, setDepositAmount] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
 
   // Store confirmation details to prevent recalculation when depositAmount clears
   const [confirmationDetails, setConfirmationDetails] = useState({
@@ -41,6 +46,13 @@ export function TokenVaultSelector() {
     symbol: "",
     projectedReturn: "0.00",
     projectedEarnings: "0.00",
+  });
+
+  // Store withdrawal details
+  const [withdrawalDetails, setWithdrawalDetails] = useState({
+    amount: "",
+    symbol: "",
+    currentBalance: "0",
   });
 
   // Convert blockchain vaults to TokenVault format
@@ -118,6 +130,8 @@ export function TokenVaultSelector() {
         vaultAddress: selected.vaultAddress!,
         tokenAddress: selected.tokenAddress!,
         amount: confirmationDetails.amount,
+        vaultName: selected.name,
+        tokenSymbol: confirmationDetails.symbol,
       });
 
       if (result.success && result.txHash) {
@@ -139,6 +153,65 @@ export function TokenVaultSelector() {
       toast({
         title: "Deposit Failed ❌",
         description: err.message || "Failed to deposit into vault",
+        variant: "destructive",
+      });
+      return { success: false };
+    }
+  };
+
+  const handleWithdrawClick = () => {
+    if (!selected || !withdrawAmount) return;
+
+    // Get current balance from vault
+    const currentVault = vaults?.find(
+      (v) => v.vaultAddress === selected.vaultAddress
+    );
+    // TODO: Fetch actual user deposit from contract
+    const userDeposit = "0"; // Placeholder - should fetch from contract
+
+    setWithdrawalDetails({
+      amount: withdrawAmount,
+      symbol: selected.symbol,
+      currentBalance: userDeposit,
+    });
+    setShowWithdrawModal(true);
+  };
+
+  const handleConfirmWithdraw = async (): Promise<{
+    success: boolean;
+    txHash?: string;
+  }> => {
+    if (!selected || !withdrawalDetails.amount) {
+      return { success: false };
+    }
+
+    try {
+      const result = await withdraw({
+        vaultAddress: selected.vaultAddress!,
+        amount: withdrawalDetails.amount,
+        vaultName: selected.name,
+        tokenSymbol: withdrawalDetails.symbol,
+      });
+
+      if (result.success && result.txHash) {
+        // Refresh vault data after successful withdrawal
+        refresh();
+        // Clear withdraw amount
+        setWithdrawAmount("");
+        return { success: true, txHash: result.txHash };
+      } else {
+        toast({
+          title: "Withdrawal Failed ❌",
+          description: "Failed to withdraw from vault",
+          variant: "destructive",
+        });
+        return { success: false };
+      }
+    } catch (err: any) {
+      console.error("Withdrawal error:", err);
+      toast({
+        title: "Withdrawal Failed ❌",
+        description: err.message || "Failed to withdraw from vault",
         variant: "destructive",
       });
       return { success: false };
@@ -318,25 +391,74 @@ export function TokenVaultSelector() {
                 ? "LOADING..."
                 : "[DEPOSIT TO VAULT]"}
             </Button>
+
+            {/* Withdrawal Section */}
+            <div className="pt-6 border-t border-border/30 space-y-4">
+              <label className="block text-sm font-mono text-foreground/60">
+                WITHDRAW FROM VAULT
+              </label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={withdrawAmount}
+                onChange={(e) => setWithdrawAmount(e.target.value)}
+                className="bg-background border-border text-foreground placeholder:text-foreground/30"
+                min={0}
+              />
+              <p className="text-xs font-mono text-foreground/40">
+                Your balance: 0 {selected.symbol}{" "}
+                {/* TODO: Fetch from contract */}
+              </p>
+              <button
+                onClick={handleWithdrawClick}
+                disabled={
+                  !withdrawAmount ||
+                  Number.parseFloat(withdrawAmount) <= 0 ||
+                  isLoading ||
+                  isWithdrawing
+                }
+                className="w-full px-6 py-3 border border-border bg-background text-foreground font-mono text-sm font-medium transition-all duration-300 hover:border-primary hover:bg-primary/10 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isWithdrawing
+                  ? "PROCESSING..."
+                  : isLoading
+                  ? "LOADING..."
+                  : "[WITHDRAW FROM VAULT]"}
+              </button>
+            </div>
           </>
         )}
       </div>
 
       {selected && (
-        <InvestConfirmationModal
-          isOpen={showConfirmation}
-          onClose={() => {
-            setShowConfirmation(false);
-          }}
-          onConfirm={handleConfirmDeposit}
-          strategy={`${selected.name} (${selected.symbol})`}
-          amount={confirmationDetails.amount}
-          symbol={confirmationDetails.symbol}
-          apy={selected.apy || 0}
-          projectedReturn={confirmationDetails.projectedReturn}
-          lockPeriod="Flexible"
-          riskLevel="Low"
-        />
+        <>
+          <InvestConfirmationModal
+            isOpen={showConfirmation}
+            onClose={() => {
+              setShowConfirmation(false);
+            }}
+            onConfirm={handleConfirmDeposit}
+            strategy={`${selected.name} (${selected.symbol})`}
+            amount={confirmationDetails.amount}
+            symbol={confirmationDetails.symbol}
+            apy={selected.apy || 0}
+            projectedReturn={confirmationDetails.projectedReturn}
+            lockPeriod="Flexible"
+            riskLevel="Low"
+          />
+
+          <VaultWithdrawModal
+            isOpen={showWithdrawModal}
+            onClose={() => {
+              setShowWithdrawModal(false);
+            }}
+            onConfirm={handleConfirmWithdraw}
+            vaultName={selected.name}
+            symbol={withdrawalDetails.symbol}
+            amount={withdrawalDetails.amount}
+            currentBalance={withdrawalDetails.currentBalance}
+          />
+        </>
       )}
     </>
   );
