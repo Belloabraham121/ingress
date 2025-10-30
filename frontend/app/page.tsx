@@ -7,6 +7,8 @@ import { FeatureCard } from "@/components/feature-card";
 import { Button } from "@/components/ui/button";
 import { Pill } from "@/components/pill";
 import { useState } from "react";
+import { useVaults } from "@/hooks/useVaults";
+import { useStakingPools } from "@/hooks/useStakingPools";
 
 const GL = dynamic(
   () => import("@/components/gl").then((mod) => ({ default: mod.GL })),
@@ -25,6 +27,8 @@ const Leva = dynamic(
 
 export default function Home() {
   const [hovering, setHovering] = useState(false);
+  const { vaults, isLoading: isLoadingVaults } = useVaults();
+  const { pools, isLoading: isLoadingPools } = useStakingPools();
 
   return (
     <div className="bg-background text-foreground">
@@ -118,173 +122,140 @@ export default function Home() {
       </section>
 
       {/* Investment Strategies Table */}
-      <section className="relative z-10 py-24 px-4 md:px-8 lg:px-12">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-sentient mb-4">
-              Investment Strategies
-            </h2>
-            <p className="font-mono text-foreground/60 max-w-2xl mx-auto">
-              Choose the strategy that aligns with your financial goals and risk
-              tolerance
-            </p>
-          </div>
+      {!isLoadingVaults && vaults.length > 0 && (
+        <section className="relative z-10 py-24 px-4 md:px-8 lg:px-12">
+          <div className="container mx-auto max-w-6xl">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-sentient mb-4">
+                Investment Strategies
+              </h2>
+              <p className="font-mono text-foreground/60 max-w-2xl mx-auto">
+                On‑chain vaults with transparent APRs and TVL
+              </p>
+            </div>
 
-          <div className="border border-border bg-background p-8 overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-4 px-4 font-sentient text-sm">
-                    Strategy
-                  </th>
-                  <th className="text-left py-4 px-4 font-sentient text-sm">
-                    Annual APY
-                  </th>
-                  <th className="text-left py-4 px-4 font-sentient text-sm">
-                    Risk Level
-                  </th>
-                  <th className="text-left py-4 px-4 font-sentient text-sm">
-                    Min. Investment
-                  </th>
-                  <th className="text-left py-4 px-4 font-sentient text-sm">
-                    Lock Period
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  {
-                    strategy: "Conservative",
-                    apy: "8.5%",
-                    risk: "Low",
-                    min: "$100",
-                    lock: "30 days",
-                  },
-                  {
-                    strategy: "Balanced",
-                    apy: "14.2%",
-                    risk: "Medium",
-                    min: "$500",
-                    lock: "60 days",
-                  },
-                  {
-                    strategy: "Growth",
-                    apy: "22.8%",
-                    risk: "High",
-                    min: "$1,000",
-                    lock: "90 days",
-                  },
-                ].map((row, idx) => (
-                  <tr
-                    key={idx}
-                    className="border-b border-border/50 last:border-0 hover:bg-primary/5 transition-colors"
-                  >
-                    <td className="py-4 px-4 font-mono text-sm text-foreground">
-                      {row.strategy}
-                    </td>
-                    <td className="py-4 px-4 font-mono text-sm text-primary font-medium">
-                      {row.apy}
-                    </td>
-                    <td className="py-4 px-4 font-mono text-sm text-foreground/70">
-                      {row.risk}
-                    </td>
-                    <td className="py-4 px-4 font-mono text-sm text-foreground/70">
-                      {row.min}
-                    </td>
-                    <td className="py-4 px-4 font-mono text-sm text-foreground/70">
-                      {row.lock}
-                    </td>
+            <div className="border border-border bg-background p-8 overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-4 px-4 font-sentient text-sm">
+                      Strategy
+                    </th>
+                    <th className="text-left py-4 px-4 font-sentient text-sm">
+                      Annual APR
+                    </th>
+                    <th className="text-left py-4 px-4 font-sentient text-sm">
+                      TVL
+                    </th>
+                    <th className="text-left py-4 px-4 font-sentient text-sm">
+                      Depositors
+                    </th>
+                    <th className="text-left py-4 px-4 font-sentient text-sm">
+                      Status
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {vaults.map((v, idx) => (
+                    <tr
+                      key={`${v.vaultAddress}-${idx}`}
+                      className="border-b border-border/50 last:border-0 hover:bg-primary/5 transition-colors"
+                    >
+                      <td className="py-4 px-4 font-mono text-sm text-foreground">
+                        {v.name}
+                      </td>
+                      <td className="py-4 px-4 font-mono text-sm text-primary font-medium">
+                        {v.apr.toFixed(2)}%
+                      </td>
+                      <td className="py-4 px-4 font-mono text-sm text-foreground/70">
+                        {v.tvl}
+                      </td>
+                      <td className="py-4 px-4 font-mono text-sm text-foreground/70">
+                        {v.depositorCount}
+                      </td>
+                      <td
+                        className={`py-4 px-4 font-mono text-sm ${
+                          v.active ? "text-green-500" : "text-foreground/60"
+                        }`}
+                      >
+                        {v.active ? "Active" : "Paused"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Staking Pools Table */}
-      <section className="relative z-10 py-24 px-4 md:px-8 lg:px-12">
-        <div className="container mx-auto max-w-6xl">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-sentient mb-4">
-              Staking Pools
-            </h2>
-            <p className="font-mono text-foreground/60 max-w-2xl mx-auto">
-              Earn passive income by staking your assets in our secure pools
-            </p>
-          </div>
+      {!isLoadingPools && pools.length > 0 && (
+        <section className="relative z-10 py-24 px-4 md:px-8 lg:px-12">
+          <div className="container mx-auto max-w-6xl">
+            <div className="text-center mb-16">
+              <h2 className="text-4xl md:text-5xl font-sentient mb-4">
+                Staking Pools
+              </h2>
+              <p className="font-mono text-foreground/60 max-w-2xl mx-auto">
+                Live on‑chain pool metrics
+              </p>
+            </div>
 
-          <div className="border border-border bg-background p-8 overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border">
-                  <th className="text-left py-4 px-4 font-sentient text-sm">
-                    Asset
-                  </th>
-                  <th className="text-left py-4 px-4 font-sentient text-sm">
-                    Daily Reward
-                  </th>
-                  <th className="text-left py-4 px-4 font-sentient text-sm">
-                    Total Staked
-                  </th>
-                  <th className="text-left py-4 px-4 font-sentient text-sm">
-                    Unstake Cooldown
-                  </th>
-                  <th className="text-left py-4 px-4 font-sentient text-sm">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  {
-                    asset: "USDT",
-                    reward: "0.05%",
-                    staked: "$2.5M",
-                    cooldown: "7 days",
-                    status: "Active",
-                  },
-                  {
-                    asset: "USDC",
-                    reward: "0.048%",
-                    staked: "$1.8M",
-                    cooldown: "7 days",
-                    status: "Active",
-                  },
-                  {
-                    asset: "ETH",
-                    reward: "0.12%",
-                    staked: "$850K",
-                    cooldown: "14 days",
-                    status: "Active",
-                  },
-                ].map((row, idx) => (
-                  <tr
-                    key={idx}
-                    className="border-b border-border/50 last:border-0 hover:bg-primary/5 transition-colors"
-                  >
-                    <td className="py-4 px-4 font-mono text-sm text-primary font-medium">
-                      {row.asset}
-                    </td>
-                    <td className="py-4 px-4 font-mono text-sm text-foreground">
-                      {row.reward}
-                    </td>
-                    <td className="py-4 px-4 font-mono text-sm text-foreground/70">
-                      {row.staked}
-                    </td>
-                    <td className="py-4 px-4 font-mono text-sm text-foreground/70">
-                      {row.cooldown}
-                    </td>
-                    <td className="py-4 px-4 font-mono text-sm text-green-500">
-                      {row.status}
-                    </td>
+            <div className="border border-border bg-background p-8 overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-4 px-4 font-sentient text-sm">
+                      Pool
+                    </th>
+                    <th className="text-left py-4 px-4 font-sentient text-sm">
+                      Annual APR
+                    </th>
+                    <th className="text-left py-4 px-4 font-sentient text-sm">
+                      Total Staked
+                    </th>
+                    <th className="text-left py-4 px-4 font-sentient text-sm">
+                      Stakers
+                    </th>
+                    <th className="text-left py-4 px-4 font-sentient text-sm">
+                      Status
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {pools.map((pool) => (
+                    <tr
+                      key={pool.id}
+                      className="border-b border-border/50 last:border-0 hover:bg-primary/5 transition-colors"
+                    >
+                      <td className="py-4 px-4 font-mono text-sm text-primary font-medium">
+                        {pool.name}
+                      </td>
+                      <td className="py-4 px-4 font-mono text-sm text-foreground">
+                        {pool.apyPercentage.toFixed(2)}%
+                      </td>
+                      <td className="py-4 px-4 font-mono text-sm text-foreground/70">
+                        {pool.totalStakedFormatted}
+                      </td>
+                      <td className="py-4 px-4 font-mono text-sm text-foreground/70">
+                        {pool.stakerCount}
+                      </td>
+                      <td
+                        className={`py-4 px-4 font-mono text-sm ${
+                          pool.active ? "text-green-500" : "text-foreground/60"
+                        }`}
+                      >
+                        {pool.active ? "Active" : "Paused"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* About Section */}
       <section id="about" className="relative z-10 py-24 px-4 md:px-8 lg:px-12">
