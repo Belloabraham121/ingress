@@ -14,6 +14,8 @@ import { StakingOverview } from "@/components/staking-overview";
 import { InvestmentOverview } from "@/components/investment-overview";
 import { RecentActivityCard } from "@/components/recent-activity-card";
 import { useAuth } from "@/hooks/useAuth";
+import { getEvmAddressFromAccountId } from "@/lib/hedera-utils";
+import { useUserVaultPositions } from "@/hooks/useUserVaultPositions";
 import { useRouter } from "next/navigation";
 
 type TabType = "swap" | "invest" | "stake" | "account" | "profile";
@@ -23,6 +25,8 @@ export default function DashboardPage() {
   const { logout, getProfile } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("swap");
   const [userName, setUserName] = useState<string>("");
+  const [accountId, setAccountId] = useState<string>("");
+  const [evmAddress, setEvmAddress] = useState<string>("");
 
   useEffect(() => {
     loadProfile();
@@ -32,11 +36,19 @@ export default function DashboardPage() {
     try {
       const profile = await getProfile();
       setUserName(`${profile.user.firstName} ${profile.user.lastName}`);
+      const acctId = profile.wallet.accountId || "";
+      setAccountId(acctId);
+      if (acctId) {
+        const evm = await getEvmAddressFromAccountId(acctId);
+        setEvmAddress(evm);
+      }
     } catch (err) {
       // If not authenticated, redirect to login
       router.push("/signin");
     }
   };
+
+  const { summary, positions } = useUserVaultPositions(evmAddress);
 
   const handleLogout = () => {
     logout();
@@ -62,9 +74,7 @@ export default function DashboardPage() {
               {userName}
             </span>
           )}
-          <Button variant="outline" onClick={handleLogout}>
-            [Sign Out]
-          </Button>
+          <Button onClick={handleLogout}>[Sign Out]</Button>
         </div>
       </div>
 
@@ -83,10 +93,10 @@ export default function DashboardPage() {
 
           <div className="mb-8 flex gap-3 flex-wrap">
             <Link href="/investments">
-              <Button variant="outline">[View Investment Activities]</Button>
+              <Button>[View Investment Activities]</Button>
             </Link>
             <Link href="/staking">
-              <Button variant="outline">[View Staking Activities]</Button>
+              <Button>[View Staking Activities]</Button>
             </Link>
           </div>
 
@@ -135,11 +145,27 @@ export default function DashboardPage() {
                   PORTFOLIO VALUE
                 </p>
                 <p className="text-3xl font-sentient text-primary mb-2">
-                  $12,450.50
+                  $
+                  {summary
+                    ? Number(summary.totalCurrentValue).toLocaleString(
+                        undefined,
+                        { maximumFractionDigits: 2 }
+                      )
+                    : "0.00"}
                 </p>
-                <p className="text-xs font-mono text-green-500">
-                  +12.5% this month
-                </p>
+                {summary && (
+                  <p className="text-xs font-mono text-foreground/50">
+                    Deposited $
+                    {Number(summary.totalDeposited).toLocaleString(undefined, {
+                      maximumFractionDigits: 2,
+                    })}{" "}
+                    · Pending Rewards $
+                    {Number(summary.totalPendingRewards).toLocaleString(
+                      undefined,
+                      { maximumFractionDigits: 2 }
+                    )}
+                  </p>
+                )}
               </div>
 
               {/* Active Positions */}
@@ -148,24 +174,28 @@ export default function DashboardPage() {
                   ACTIVE VAULT POSITIONS
                 </p>
                 <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono">USDT Vault</span>
-                    <span className="text-sm font-mono text-primary">
-                      $2,000
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono">USDC Vault</span>
-                    <span className="text-sm font-mono text-primary">
-                      $4,200
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm font-mono">ETH Vault</span>
-                    <span className="text-sm font-mono text-primary">
-                      $6,250
-                    </span>
-                  </div>
+                  {positions && positions.length > 0 ? (
+                    positions.map((pos) => (
+                      <div
+                        key={pos.vaultAddress}
+                        className="flex justify-between items-center"
+                      >
+                        <span className="text-sm font-mono">
+                          {pos.vaultName}
+                        </span>
+                        <span className="text-sm font-mono text-primary">
+                          $
+                          {Number(pos.currentValue).toLocaleString(undefined, {
+                            maximumFractionDigits: 2,
+                          })}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs font-mono text-foreground/50">
+                      No active positions
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -174,7 +204,15 @@ export default function DashboardPage() {
                 <p className="text-xs font-mono text-foreground/60 mb-2">
                   PENDING VAULT REWARDS
                 </p>
-                <p className="text-2xl font-sentient text-primary">$127.35</p>
+                <p className="text-2xl font-sentient text-primary">
+                  $
+                  {summary
+                    ? Number(summary.totalPendingRewards).toLocaleString(
+                        undefined,
+                        { maximumFractionDigits: 2 }
+                      )
+                    : "0.00"}
+                </p>
                 <p className="text-xs font-mono text-foreground/50 mt-2">
                   Claim available
                 </p>

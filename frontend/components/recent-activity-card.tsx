@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useActivity } from "@/hooks/useActivity";
+import { SUPPORTED_TOKENS } from "@/lib/hedera-utils";
 import { Activity } from "@/types/api";
 import { ExternalLink, Loader2 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
@@ -55,10 +56,11 @@ export function RecentActivityCard({
 
   const formatAmount = (amount: string): string => {
     try {
-      // Convert from wei (18 decimals) to human-readable format
-      const formatted = ethers.formatUnits(amount, 18);
-      // Parse and format to max 6 decimal places, remove trailing zeros
-      const num = parseFloat(formatted);
+      const isBigIntLike = /^[0-9]+$/.test(amount) && amount.length > 18;
+      const num = isBigIntLike
+        ? parseFloat(ethers.formatUnits(amount, 18))
+        : parseFloat(amount);
+      if (isNaN(num)) return amount;
       return num.toLocaleString("en-US", {
         maximumFractionDigits: 6,
         minimumFractionDigits: 0,
@@ -66,6 +68,24 @@ export function RecentActivityCard({
     } catch (err) {
       return amount;
     }
+  };
+
+  const addressToSymbol: Record<string, string> = Object.values(
+    SUPPORTED_TOKENS
+  ).reduce((acc, t) => {
+    acc[t.address.toLowerCase()] = t.symbol;
+    return acc;
+  }, {} as Record<string, string>);
+
+  const resolveTokenLabel = (token: string | undefined): string => {
+    if (!token) return "tokens";
+    const t = token.trim();
+    if (t.toUpperCase() === "NGN") return "NGN";
+    if (t.toUpperCase() === "HBAR") return "HBAR";
+    if (t.startsWith("0x")) {
+      return addressToSymbol[t.toLowerCase()] || t;
+    }
+    return t;
   };
 
   const getActivityDescription = (activity: Activity): string => {
@@ -89,9 +109,9 @@ export function RecentActivityCard({
           activity.tokenSymbol || "tokens"
         } from ${activity.poolName || "Pool"}`;
       case "swap":
-        return `Swapped ${formattedAmount} ${
-          activity.fromToken || "tokens"
-        } for ${activity.toToken || "tokens"}`;
+        return `Swapped ${formattedAmount} ${resolveTokenLabel(
+          activity.fromToken
+        )} for ${resolveTokenLabel(activity.toToken)}`;
       default:
         return `Transaction: ${formattedAmount} ${
           activity.tokenSymbol || "tokens"
