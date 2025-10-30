@@ -198,6 +198,9 @@ export function SwapCard() {
           return { success: false };
         }
         resetForm();
+        try {
+          window.dispatchEvent(new Event("walletUpdated"));
+        } catch {}
         return {
           success: true,
           transactionHash: data.data?.transactionHash,
@@ -223,6 +226,9 @@ export function SwapCard() {
           return { success: false };
         }
         resetForm();
+        try {
+          window.dispatchEvent(new Event("walletUpdated"));
+        } catch {}
         return {
           success: true,
           transactionHash: data.data?.transactionHash,
@@ -247,7 +253,7 @@ export function SwapCard() {
             }),
           });
           const depData = await respDeposit.json();
-          if (!depData.success) {
+          if (!depData.success || depData.data?.status !== 1) {
             alert(depData.message || "❌ Deposit HBAR failed.");
             return { success: false };
           }
@@ -276,6 +282,9 @@ export function SwapCard() {
         }
 
         resetForm();
+        try {
+          window.dispatchEvent(new Event("walletUpdated"));
+        } catch {}
         return {
           success: true,
           transactionHash: data.data?.transactionHash || "Swap executed",
@@ -348,6 +357,9 @@ export function SwapCard() {
         }
 
         resetForm();
+        try {
+          window.dispatchEvent(new Event("walletUpdated"));
+        } catch {}
         return {
           success: true,
           transactionHash: data.data?.transferCode || "Cashout initiated",

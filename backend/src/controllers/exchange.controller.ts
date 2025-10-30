@@ -13,6 +13,7 @@ import { Wallet } from "../models/Wallet";
 import { walletGeneratorService } from "../services/walletGenerator.service";
 import { getEvmAddressFromAccountId } from "../utils/hedera";
 import { activityService } from "../services/activity.service";
+import { blockchainService } from "../services/blockchain.service";
 
 const HEDERA_TESTNET_RPC = "https://testnet.hashio.io/api";
 
@@ -309,6 +310,27 @@ export const depositHbar = async (
     const privateKey = PrivateKey.fromStringECDSA(privateKeyHex);
     client.setOperator(accountId, privateKey);
 
+    // Diagnostics: user HBAR and exchange HBAR balances BEFORE deposit
+    try {
+      const rpc = new ethers.JsonRpcProvider("https://testnet.hashio.io/api");
+      const userPre = await blockchainService.getHBARBalance(wallet.accountId);
+      const exchPre = await rpc.getBalance(exchangeAddress);
+      console.log(
+        `[depositHbar] BEFORE → user ${wallet.accountId} balance: ${userPre} HBAR`
+      );
+      console.log(
+        `[depositHbar] BEFORE → exchange ${exchangeAddress} HBAR: ${ethers.formatUnits(
+          exchPre,
+          8
+        )}`
+      );
+    } catch (preErr) {
+      console.warn(
+        "[depositHbar] Failed to fetch pre-deposit balances:",
+        preErr
+      );
+    }
+
     // depositHbar() payable
     const depositInterface = new ethers.Interface([
       "function depositHbar() payable",
@@ -327,12 +349,46 @@ export const depositHbar = async (
     const receipt = await txResponse.getReceipt(client);
     client.close();
 
+    const isSuccess = receipt.status.toString() === "SUCCESS";
+    if (!isSuccess) {
+      res.status(400).json({
+        success: false,
+        message: `HBAR deposit failed: ${receipt.status.toString()}`,
+        data: {
+          transactionHash: txResponse.transactionId.toString(),
+          status: 0,
+        },
+      });
+      return;
+    }
+
+    // Diagnostics: user HBAR and exchange HBAR balances AFTER deposit
+    try {
+      const rpc = new ethers.JsonRpcProvider("https://testnet.hashio.io/api");
+      const userPost = await blockchainService.getHBARBalance(wallet.accountId);
+      const exchPost = await rpc.getBalance(exchangeAddress);
+      console.log(
+        `[depositHbar] AFTER  → user ${wallet.accountId} balance: ${userPost} HBAR`
+      );
+      console.log(
+        `[depositHbar] AFTER  → exchange ${exchangeAddress} HBAR: ${ethers.formatUnits(
+          exchPost,
+          8
+        )}`
+      );
+    } catch (postErr) {
+      console.warn(
+        "[depositHbar] Failed to fetch post-deposit balances:",
+        postErr
+      );
+    }
+
     res.status(200).json({
       success: true,
       message: "HBAR deposit to exchange successful",
       data: {
         transactionHash: txResponse.transactionId.toString(),
-        status: receipt.status.toString() === "SUCCESS" ? 1 : 0,
+        status: 1,
       },
     });
   } catch (error: any) {
@@ -844,6 +900,21 @@ export const cashoutTokenToNaira = async (
       });
     } catch {}
 
+    // Immediately reflect NGN balance increase in DB (since webhook for transfer.success isn't updating balances)
+    try {
+      const oldBal = bankAccount.balance || 0;
+      bankAccount.balance = oldBal + naira;
+      await bankAccount.save();
+      console.log(
+        `[cashout] NGN balance credited: ₦${oldBal} → ₦${bankAccount.balance} (+₦${naira})`
+      );
+    } catch (balErr) {
+      console.warn(
+        "[cashout] Failed to credit NGN balance immediately:",
+        balErr
+      );
+    }
+
     res.status(200).json({
       success: true,
       message: "Cashout initiated",
@@ -1287,6 +1358,21 @@ export const cashoutHbarToNaira = async (
         },
       });
     } catch {}
+
+    // Immediately reflect NGN balance increase in DB
+    try {
+      const oldBal = bankAccount.balance || 0;
+      bankAccount.balance = oldBal + naira;
+      await bankAccount.save();
+      console.log(
+        `[cashout-hbar] NGN balance credited: ₦${oldBal} → ₦${bankAccount.balance} (+₦${naira})`
+      );
+    } catch (balErr) {
+      console.warn(
+        "[cashout-hbar] Failed to credit NGN balance immediately:",
+        balErr
+      );
+    }
 
     res.status(200).json({
       success: true,
