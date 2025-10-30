@@ -31,42 +31,44 @@ export default function Home() {
       <Header />
       <Leva hidden />
 
-      {/* Hero Section */}
-      <section
-        id="home"
-        className="relative min-h-screen flex flex-col justify-between pt-32 pb-16"
-      >
+      <div className="relative overflow-hidden">
         <GL hovering={hovering} />
 
-        <div className="relative z-10 flex-1 flex flex-col justify-center items-center text-center px-4">
-          <Pill className="mb-6">BETA RELEASE</Pill>
-          <h1 className="text-5xl sm:text-6xl md:text-7xl font-sentient text-balance">
-            Unlock your <br />
-            <i className="font-light">future</i> growth
-          </h1>
-          <p className="font-mono text-sm sm:text-base text-foreground/60 text-balance mt-8 max-w-[540px] leading-relaxed">
-            Skal Ventures is a cutting-edge blockchain investment platform that
-            democratizes access to sophisticated investment strategies. Swap
-            currencies, invest for growth, and earn passive income through
-            staking—all in one secure ecosystem.
-          </p>
+        {/* Hero Section */}
+        <section
+          id="home"
+          className="relative z-10 min-h-screen flex flex-col justify-between pt-32 pb-16"
+        >
+          <div className="relative z-10 flex-1 flex flex-col justify-center items-center text-center px-4">
+            <Pill className="mb-6">BETA RELEASE</Pill>
+            <h1 className="text-5xl sm:text-6xl md:text-7xl font-sentient text-balance">
+              Unlock your <br />
+              <i className="font-light">future</i> growth
+            </h1>
+            <p className="font-mono text-sm sm:text-base text-foreground/60 text-balance mt-8 max-w-[540px] leading-relaxed">
+              The all‑in‑one money app for the unbanked. Send and swap Naira,
+              buy and send USDT, and seamlessly bridge bank rails and
+              crypto—then stake and invest for yield—in one secure, simple
+              platform.
+            </p>
 
-          <Link className="contents" href="/signin">
-            <Button
-              className="mt-14"
-              onMouseEnter={() => setHovering(true)}
-              onMouseLeave={() => setHovering(false)}
-            >
-              [Get Started]
-            </Button>
-          </Link>
-        </div>
-      </section>
+            <Link className="contents" href="/signin">
+              <Button
+                className="mt-14"
+                onMouseEnter={() => setHovering(true)}
+                onMouseLeave={() => setHovering(false)}
+              >
+                [Get Started]
+              </Button>
+            </Link>
+          </div>
+        </section>
+      </div>
 
       {/* Features Section */}
       <section
         id="features"
-        className="py-24 px-4 md:px-8 lg:px-12 bg-background/50"
+        className="relative z-10 py-24 px-4 md:px-8 lg:px-12 "
       >
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
@@ -116,7 +118,7 @@ export default function Home() {
       </section>
 
       {/* Investment Strategies Table */}
-      <section className="py-24 px-4 md:px-8 lg:px-12">
+      <section className="relative z-10 py-24 px-4 md:px-8 lg:px-12">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-sentient mb-4">
@@ -201,7 +203,7 @@ export default function Home() {
       </section>
 
       {/* Staking Pools Table */}
-      <section className="py-24 px-4 md:px-8 lg:px-12 bg-background/50">
+      <section className="relative z-10 py-24 px-4 md:px-8 lg:px-12">
         <div className="container mx-auto max-w-6xl">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-sentient mb-4">
@@ -285,7 +287,7 @@ export default function Home() {
       </section>
 
       {/* About Section */}
-      <section id="about" className="py-24 px-4 md:px-8 lg:px-12">
+      <section id="about" className="relative z-10 py-24 px-4 md:px-8 lg:px-12">
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-sentient mb-4">
@@ -361,7 +363,7 @@ export default function Home() {
       {/* Contact Section */}
       <section
         id="contact"
-        className="py-24 px-4 md:px-8 lg:px-12 bg-background/50"
+        className="relative z-10 py-24 px-4 md:px-8 lg:px-12"
       >
         <div className="container mx-auto max-w-2xl text-center">
           <h2 className="text-4xl md:text-5xl font-sentient mb-4">
@@ -405,7 +407,7 @@ export default function Home() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-12 px-4 md:px-8 lg:px-12">
+      <footer className="relative z-10 border-t border-border py-12 px-4 md:px-8 lg:px-12">
         <div className="container mx-auto max-w-6xl">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-12">
             <div>
@@ -414,7 +416,7 @@ export default function Home() {
                 <li>
                   <Link
                     href="#features"
-                    className="hover:text-foreground/100 transition-colors"
+                    className="hover:text-foreground transition-colors"
                   >
                     Features
                   </Link>
@@ -422,7 +424,7 @@ export default function Home() {
                 <li>
                   <Link
                     href="#about"
-                    className="hover:text-foreground/100 transition-colors"
+                    className="hover:text-foreground transition-colors"
                   >
                     About
                   </Link>
@@ -430,7 +432,7 @@ export default function Home() {
                 <li>
                   <Link
                     href="/signin"
-                    className="hover:text-foreground/100 transition-colors"
+                    className="hover:text-foreground transition-colors"
                   >
                     Sign In
                   </Link>
@@ -443,7 +445,7 @@ export default function Home() {
                 <li>
                   <Link
                     href="#about"
-                    className="hover:text-foreground/100 transition-colors"
+                    className="hover:text-foreground transition-colors"
                   >
                     About Us
                   </Link>
@@ -451,7 +453,7 @@ export default function Home() {
                 <li>
                   <Link
                     href="#contact"
-                    className="hover:text-foreground/100 transition-colors"
+                    className="hover:text-foreground transition-colors"
                   >
                     Contact
                   </Link>
@@ -459,7 +461,7 @@ export default function Home() {
                 <li>
                   <a
                     href="#"
-                    className="hover:text-foreground/100 transition-colors"
+                    className="hover:text-foreground transition-colors"
                   >
                     Blog
                   </a>
@@ -472,7 +474,7 @@ export default function Home() {
                 <li>
                   <a
                     href="#"
-                    className="hover:text-foreground/100 transition-colors"
+                    className="hover:text-foreground transition-colors"
                   >
                     Privacy Policy
                   </a>
@@ -480,7 +482,7 @@ export default function Home() {
                 <li>
                   <a
                     href="#"
-                    className="hover:text-foreground/100 transition-colors"
+                    className="hover:text-foreground transition-colors"
                   >
                     Terms of Service
                   </a>
@@ -488,7 +490,7 @@ export default function Home() {
                 <li>
                   <a
                     href="#"
-                    className="hover:text-foreground/100 transition-colors"
+                    className="hover:text-foreground transition-colors"
                   >
                     Disclaimer
                   </a>
@@ -501,7 +503,7 @@ export default function Home() {
                 <li>
                   <a
                     href="#"
-                    className="hover:text-foreground/100 transition-colors"
+                    className="hover:text-foreground transition-colors"
                   >
                     Twitter
                   </a>
@@ -509,7 +511,7 @@ export default function Home() {
                 <li>
                   <a
                     href="#"
-                    className="hover:text-foreground/100 transition-colors"
+                    className="hover:text-foreground transition-colors"
                   >
                     Discord
                   </a>
@@ -517,7 +519,7 @@ export default function Home() {
                 <li>
                   <a
                     href="#"
-                    className="hover:text-foreground/100 transition-colors"
+                    className="hover:text-foreground transition-colors"
                   >
                     LinkedIn
                   </a>

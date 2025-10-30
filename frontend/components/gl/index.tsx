@@ -44,7 +44,7 @@ export const GL = ({ hovering }: { hovering: boolean }) => {
     manualTime: { value: 0, min: 0, max: 50, step: 0.01 },
   });
   return (
-    <div id="webgl">
+    <div id="webgl" className="absolute inset-0 z-0 pointer-events-none">
       <Canvas
         camera={{
           position: [
@@ -72,7 +72,7 @@ export const GL = ({ hovering }: { hovering: boolean }) => {
           manualTime={manualTime}
           introspect={hovering}
         />
-        <Effects multisamping={0} disableGamma>
+        <Effects multisampling={0} disableGamma>
           <shaderPass
             args={[VignetteShader]}
             uniforms-darkness-value={vignetteDarkness}
