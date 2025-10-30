@@ -168,7 +168,7 @@ export default function Home() {
                         {v.apr.toFixed(2)}%
                       </td>
                       <td className="py-4 px-4 font-mono text-sm text-foreground/70">
-                        {v.tvl}
+                        ${v.tvl}
                       </td>
                       <td className="py-4 px-4 font-mono text-sm text-foreground/70">
                         {v.depositorCount}
@@ -236,7 +236,7 @@ export default function Home() {
                         {pool.apyPercentage.toFixed(2)}%
                       </td>
                       <td className="py-4 px-4 font-mono text-sm text-foreground/70">
-                        {pool.totalStakedFormatted}
+                        ${pool.totalStakedFormatted}
                       </td>
                       <td className="py-4 px-4 font-mono text-sm text-foreground/70">
                         {pool.stakerCount}
