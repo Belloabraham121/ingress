@@ -228,12 +228,31 @@ export function SwapCard() {
           transactionHash: data.data?.transactionHash,
         };
       }
-      // Case 4: HBAR → Naira
-      else if (fromToken.symbol === "HBAR" && toToken.symbol === "NGN") {
-        alert(
-          "⚠️ HBAR → Naira: This feature will be available soon. For now, you can use the wallet transfer feature."
-        );
-        return { success: false };
+      // Case 4: HBAR → Token (Direct via Exchange)
+      else if (fromToken.symbol === "HBAR" && toToken.address) {
+        const token = getToken();
+        const resp = await fetch(`${API_URL}/exchange/swap-hbar-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            toTokenAddress: toToken.address,
+            hbarAmount: amount,
+          }),
+        });
+        const data = await resp.json();
+        if (!data.success) {
+          alert(data.message || "❌ Swap failed on server.");
+          return { success: false };
+        }
+
+        resetForm();
+        return {
+          success: true,
+          transactionHash: data.data?.transactionHash || "Swap executed",
+        };
       }
       // Case 5: Token → Token (Direct via Exchange, no Paystack)
       else if (fromToken.address && toToken.address) {
@@ -284,7 +303,31 @@ export function SwapCard() {
           transactionHash: data.data?.transactionHash || "Swap executed",
         };
       }
-      // Case 6: Token → HBAR or HBAR → Token
+      // Case 6: HBAR → Naira (cashout via Paystack)
+      else if (fromToken.symbol === "HBAR" && toToken.symbol === "NGN") {
+        const token = getToken();
+        const resp = await fetch(`${API_URL}/exchange/cashout-hbar`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ hbarAmount: amount }),
+        });
+        const data = await resp.json();
+        if (!data.success) {
+          alert(data.message || "❌ Cashout failed on server.");
+          return { success: false };
+        }
+
+        resetForm();
+        return {
+          success: true,
+          transactionHash: data.data?.transferCode || "Cashout initiated",
+        };
+      }
+
+      // Case 7: Token → HBAR (not yet supported)
       else {
         alert(
           "⚠️ This swap combination is not yet supported. Supported swaps:\n\n" +

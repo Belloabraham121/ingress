@@ -939,6 +939,284 @@ export const swapTokenToToken = async (
 };
 
 /**
+ * HBAR → Token swap (direct via Exchange, no Paystack)
+ * POST /api/exchange/swap-hbar-token
+ */
+export const swapHbarToToken = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    const { toTokenAddress, hbarAmount } = req.body as {
+      toTokenAddress: string;
+      hbarAmount: number;
+    };
+
+    if (!toTokenAddress || !hbarAmount || hbarAmount <= 0) {
+      res.status(400).json({
+        success: false,
+        message: "toTokenAddress and positive hbarAmount are required",
+      });
+      return;
+    }
+
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      res.status(404).json({ success: false, message: "Wallet not found" });
+      return;
+    }
+
+    const evmAddress = await getEvmAddressFromAccountId(wallet.accountId);
+
+    // Calculate output via exchange service
+    const { exchangeService } = await import("../services/exchange.service");
+    const calc = await exchangeService.calculateSwapOutput(
+      "HBAR",
+      toTokenAddress,
+      Number(hbarAmount)
+    );
+
+    // Parse target token decimals (use 18 default)
+    const decimalsTo = 18;
+    const toAmountSmallest = ethers.parseUnits(
+      calc.output.toFixed(decimalsTo),
+      decimalsTo
+    );
+
+    // Validate admin credentials
+    if (!process.env.ADMIN_ACCOUNT_ID || !process.env.ADMIN_PRIVATE_KEY) {
+      res.status(500).json({
+        success: false,
+        message:
+          "Server misconfiguration: ADMIN_ACCOUNT_ID/ADMIN_PRIVATE_KEY not set",
+      });
+      return;
+    }
+
+    // Execute transferToUser via Hedera SDK (admin)
+    const client = Client.forTestnet();
+    const adminAccountId = AccountId.fromString(process.env.ADMIN_ACCOUNT_ID);
+    const adminPrivateKey = PrivateKey.fromStringECDSA(
+      process.env.ADMIN_PRIVATE_KEY
+    );
+    client.setOperator(adminAccountId, adminPrivateKey);
+
+    const exchangeAddress =
+      process.env.EXCHANGE_CONTRACT ||
+      "0x1938C3345f2B6B2Fa3538713DB50f80ebA3a61d5";
+    const exchangeContractId = evmAddressToContractId(exchangeAddress);
+
+    const iface = new ethers.Interface([
+      "function transferToUser(address token, address to, uint256 amount)",
+    ]);
+    const callData = iface.encodeFunctionData("transferToUser", [
+      toTokenAddress,
+      evmAddress,
+      toAmountSmallest,
+    ]);
+
+    const tx = new ContractExecuteTransaction()
+      .setContractId(exchangeContractId)
+      .setGas(800000)
+      .setFunctionParameters(Buffer.from(callData.slice(2), "hex"));
+
+    const txResp = await tx.execute(client);
+    const receipt = await txResp.getReceipt(client);
+    client.close();
+
+    // Log activity
+    try {
+      await activityService.createActivity({
+        userId,
+        activityType: "swap",
+        amount: calc.output.toString(),
+        fromToken: "HBAR",
+        toToken: toTokenAddress,
+        transactionHash: txResp.transactionId.toString(),
+        status: receipt.status.toString() === "SUCCESS" ? "success" : "failed",
+        metadata: {
+          direction: "hbar_to_token",
+          fromAmount: hbarAmount.toString(),
+        },
+      });
+    } catch {}
+
+    res.status(200).json({
+      success: true,
+      message: "HBAR → Token swap executed",
+      data: {
+        transactionHash: txResp.transactionId.toString(),
+        amountOut: calc.output,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error swapping HBAR to token:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to swap HBAR to token",
+    });
+  }
+};
+
+/**
+ * Cash out HBAR → Naira (direct Paystack transfer)
+ * POST /api/exchange/cashout-hbar
+ * Body: { hbarAmount }
+ */
+export const cashoutHbarToNaira = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    const { hbarAmount } = req.body as { hbarAmount: number };
+    if (!hbarAmount || hbarAmount <= 0) {
+      res
+        .status(400)
+        .json({ success: false, message: "hbarAmount is required" });
+      return;
+    }
+
+    // Get wallet and user
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      res.status(404).json({ success: false, message: "Wallet not found" });
+      return;
+    }
+
+    const { User } = await import("../models/User");
+    const user = await User.findById(userId);
+    if (!user) {
+      res.status(404).json({ success: false, message: "User not found" });
+      return;
+    }
+
+    // Bank account validation
+    const { BankAccount } = await import("../models/BankAccount");
+    const bankAccount = await BankAccount.findOne({ userId: user._id });
+    if (!bankAccount) {
+      res.status(400).json({
+        success: false,
+        message: "No bank account found. Link a bank account to cash out.",
+      });
+      return;
+    }
+
+    // Compute NGN value using exchange service
+    const { exchangeService } = await import("../services/exchange.service");
+    const calc = await exchangeService.calculateSwapOutput(
+      "HBAR",
+      "NGN",
+      Number(hbarAmount)
+    );
+    const naira = calc.output;
+    const kobo = Math.round(naira * 100);
+
+    const { paystackService } = await import("../services/paystack.service");
+
+    // Ensure transfer recipient
+    let recipientCode = bankAccount.recipientCode as string | undefined;
+    if (!recipientCode) {
+      // Normalize bank code for test mode
+      let normalizedBankCode = bankAccount.bankCode;
+      let normalizedAccountNumber = bankAccount.accountNumber;
+      try {
+        const banksResp = await paystackService.getBanks();
+        if (
+          (!normalizedBankCode || normalizedBankCode === "test-bank") &&
+          banksResp.status &&
+          Array.isArray(banksResp.data)
+        ) {
+          const gt = banksResp.data.find((b: any) =>
+            (b.name || "").toLowerCase().includes("guaranty")
+          );
+          const first = banksResp.data[0];
+          normalizedBankCode = (gt?.code || first?.code || "058").toString();
+        }
+      } catch {
+        if (!normalizedBankCode || normalizedBankCode === "test-bank") {
+          normalizedBankCode = "058";
+        }
+      }
+      if (!/^\d{10}$/.test(normalizedAccountNumber || "")) {
+        normalizedAccountNumber = "0000000000";
+      }
+
+      const recipient = await paystackService.createTransferRecipient(
+        `${user.firstName} ${user.lastName}`,
+        normalizedAccountNumber,
+        normalizedBankCode
+      );
+      if (!recipient.status) {
+        res.status(400).json({
+          success: false,
+          message: recipient.message || "Failed to create transfer recipient",
+        });
+        return;
+      }
+      recipientCode = recipient.data.recipient_code;
+      bankAccount.recipientCode = recipientCode;
+      await bankAccount.save();
+    }
+
+    // Initiate transfer
+    const transfer = await paystackService.initiateTransfer(
+      recipientCode as string,
+      kobo,
+      `Cashout: ${hbarAmount} HBAR`
+    );
+    if (!transfer.status) {
+      res.status(400).json({
+        success: false,
+        message: transfer.message || "Failed to initiate transfer",
+      });
+      return;
+    }
+
+    // Log activity
+    try {
+      await activityService.createActivity({
+        userId,
+        activityType: "swap",
+        amount: hbarAmount.toString(),
+        fromToken: "HBAR",
+        toToken: "NGN",
+        transactionHash: transfer.data.transfer_code,
+        status: "success",
+        metadata: {
+          direction: "hbar_to_naira",
+          nairaAmount: naira.toString(),
+          kobo,
+        },
+      });
+    } catch {}
+
+    res.status(200).json({
+      success: true,
+      message: "Cashout initiated",
+      data: {
+        transferCode: transfer.data.transfer_code,
+        naira,
+      },
+    });
+  } catch (error: any) {
+    console.error("[cashout-hbar] error:", error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
  * Initiate Naira to Token payment
  * POST /api/exchange/initiate-payment
  */
