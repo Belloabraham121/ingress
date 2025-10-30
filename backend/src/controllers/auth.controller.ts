@@ -28,11 +28,11 @@ async function resolveRecipientToEvm(to: string): Promise<string> {
     );
     if (!resp.ok)
       throw new Error("Failed to resolve account ID to EVM address");
-    const data = await resp.json();
-    const evm = data.evm_address
-      ? data.evm_address.startsWith("0x")
-        ? data.evm_address
-        : `0x${data.evm_address}`
+    const data: any = await resp.json();
+    const evm = (data as any).evm_address
+      ? (data as any).evm_address.startsWith("0x")
+        ? (data as any).evm_address
+        : `0x${(data as any).evm_address}`
       : null;
     if (!evm) throw new Error("No EVM address for provided account ID");
     return evm;
@@ -570,6 +570,20 @@ export const getWalletBalance = async (
       message: "Error fetching wallet balance",
       error: (error as Error).message,
     });
+  }
+};
+
+/**
+ * Logout (stateless): client should delete stored JWT
+ * POST /api/auth/logout
+ */
+export const logout = async (req: Request, res: Response): Promise<void> => {
+  try {
+    // If you later adopt cookies, you could clear them here
+    // For JWT-in-header, instruct client to remove token
+    res.status(200).json({ success: true, message: "Logged out" });
+  } catch (error) {
+    res.status(200).json({ success: true, message: "Logged out" });
   }
 };
 
