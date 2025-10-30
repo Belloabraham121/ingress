@@ -88,10 +88,16 @@ export function RecentActivityCard({
     return t;
   };
 
+  const formatNaira = (amountStr: string): string => {
+    const n = parseFloat(amountStr);
+    if (isNaN(n)) return amountStr;
+    return `₦${n.toLocaleString("en-US", { maximumFractionDigits: 2 })}`;
+  };
+
   const getActivityDescription = (activity: Activity): string => {
     const formattedAmount = formatAmount(activity.amount);
 
-    switch (activity.activityType) {
+    switch (activity.activityType as any) {
       case "invest":
         return `Deposited ${formattedAmount} ${
           activity.tokenSymbol || "tokens"
@@ -109,14 +115,28 @@ export function RecentActivityCard({
           activity.tokenSymbol || "tokens"
         } from ${activity.poolName || "Pool"}`;
       case "swap":
-        if (activity.metadata?.direction === "token_transfer") {
+        return `Swapped ${formattedAmount} ${resolveTokenLabel(
+          activity.fromToken
+        )} for ${resolveTokenLabel(activity.toToken)}`;
+      case "transfer": {
+        const dir = activity.metadata?.direction;
+        if (dir === "token_transfer") {
           return `Sent ${formattedAmount} ${resolveTokenLabel(
             activity.fromToken
           )} to ${activity.metadata?.to || "recipient"}`;
         }
-        return `Swapped ${formattedAmount} ${resolveTokenLabel(
-          activity.fromToken
-        )} for ${resolveTokenLabel(activity.toToken)}`;
+        if (dir === "naira_transfer_debit") {
+          return `Transferred ${formatNaira(activity.amount)} to ${
+            activity.metadata?.toAccountId || "recipient"
+          }`;
+        }
+        if (dir === "naira_transfer_credit") {
+          return `Received ${formatNaira(activity.amount)} from ${
+            activity.metadata?.fromUserId || "sender"
+          }`;
+        }
+        return `Transfer ${formattedAmount}`;
+      }
       default:
         return `Transaction: ${formattedAmount} ${
           activity.tokenSymbol || "tokens"
