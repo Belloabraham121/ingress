@@ -135,9 +135,11 @@ export function useStakingDeposit() {
 
       setTxHash(stakeResponse.transactionHash);
 
-      // Dispatch event to refresh activity list
+      // Dispatch events to refresh activity list and staking positions
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("activityUpdated"));
+        window.dispatchEvent(new Event("stakingUpdated"));
+        window.dispatchEvent(new Event("positionsUpdated"));
       }
 
       if (onSuccess) {

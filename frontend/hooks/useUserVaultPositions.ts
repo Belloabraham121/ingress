@@ -198,6 +198,15 @@ export function useUserVaultPositions(userEvmAddress?: string) {
 
   useEffect(() => {
     fetchUserPositions();
+    const onUpdated = () => fetchUserPositions();
+    window.addEventListener("positionsUpdated", onUpdated);
+    window.addEventListener("vaultUpdated", onUpdated);
+    window.addEventListener("walletUpdated", onUpdated);
+    return () => {
+      window.removeEventListener("positionsUpdated", onUpdated);
+      window.removeEventListener("vaultUpdated", onUpdated);
+      window.removeEventListener("walletUpdated", onUpdated);
+    };
   }, [fetchUserPositions]);
 
   return {
