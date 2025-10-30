@@ -3,6 +3,9 @@ import { User } from "../models/User";
 import { BankAccount } from "../models/BankAccount";
 import { paystackService } from "../services/paystack.service";
 import { Transaction } from "./webhook.controller";
+import { activityService } from "../services/activity.service";
+import { Wallet } from "../models/Wallet";
+import mongoose from "mongoose";
 
 /**
  * Create virtual bank account with BVN
@@ -425,5 +428,149 @@ export const refreshBalance = async (
       message: "Error refreshing balance",
       error: (error as Error).message,
     });
+  }
+};
+
+/**
+ * Transfer NGN between users by Hedera Account ID (off-ledger)
+ * POST /api/bank-account/transfer
+ * Body: { toAccountId: string; amount: number }
+ */
+export const transferNaira = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  const session = await mongoose.startSession();
+  try {
+    const userId = (req as any).user.id;
+    const { toAccountId, amount } = req.body as {
+      toAccountId: string;
+      amount: number;
+    };
+
+    if (!toAccountId || !amount || amount <= 0) {
+      res.status(400).json({
+        success: false,
+        message: "toAccountId and positive amount are required",
+      });
+      return;
+    }
+
+    // Round to 2dp
+    const nairaAmount = Math.round(Number(amount) * 100) / 100;
+
+    // Fetch sender and recipient
+    const senderAccount = await BankAccount.findOne({ userId });
+    if (!senderAccount) {
+      res
+        .status(404)
+        .json({ success: false, message: "Sender bank account not found" });
+      return;
+    }
+
+    const recipientWallet = await Wallet.findOne({ accountId: toAccountId });
+    if (!recipientWallet) {
+      res.status(404).json({
+        success: false,
+        message: "Recipient wallet not found for accountId",
+      });
+      return;
+    }
+    const recipientAccount = await BankAccount.findOne({
+      userId: recipientWallet.userId,
+    });
+    if (!recipientAccount) {
+      res
+        .status(404)
+        .json({ success: false, message: "Recipient bank account not found" });
+      return;
+    }
+
+    if ((senderAccount.balance || 0) < nairaAmount) {
+      res
+        .status(400)
+        .json({ success: false, message: "Insufficient NGN balance" });
+      return;
+    }
+
+    // Perform atomic transfer
+    await session.withTransaction(async () => {
+      const freshSender = await BankAccount.findById(senderAccount._id).session(
+        session
+      );
+      const freshRecipient = await BankAccount.findById(
+        recipientAccount._id
+      ).session(session);
+      if (!freshSender || !freshRecipient)
+        throw new Error("Accounts not found");
+      if ((freshSender.balance || 0) < nairaAmount)
+        throw new Error("Insufficient NGN balance");
+
+      const senderOld = freshSender.balance || 0;
+      const recipientOld = freshRecipient.balance || 0;
+
+      freshSender.balance = Math.round((senderOld - nairaAmount) * 100) / 100;
+      freshRecipient.balance =
+        Math.round((recipientOld + nairaAmount) * 100) / 100;
+
+      await freshSender.save({ session });
+      await freshRecipient.save({ session });
+
+      // Record transactions (optional, for history)
+      const referenceBase = `NGN_XFER_${Date.now()}`;
+      await Transaction.create([
+        {
+          userId: freshSender.userId,
+          bankAccountId: freshSender._id,
+          reference: `${referenceBase}_DEBIT`,
+          amount: nairaAmount,
+          currency: freshSender.currency || "NGN",
+          status: "success",
+          channel: "internal_transfer",
+          metadata: { direction: "debit", toAccountId },
+        },
+        {
+          userId: freshRecipient.userId,
+          bankAccountId: freshRecipient._id,
+          reference: `${referenceBase}_CREDIT`,
+          amount: nairaAmount,
+          currency: freshRecipient.currency || "NGN",
+          status: "success",
+          channel: "internal_transfer",
+          metadata: { direction: "credit", fromUserId: userId },
+        },
+      ]);
+
+      // Create activities for sender and recipient
+      await activityService.createActivity({
+        userId: freshSender.userId.toString(),
+        activityType: "transfer" as any,
+        amount: nairaAmount.toString(),
+        fromToken: "NGN",
+        toToken: "NGN",
+        transactionHash: referenceBase,
+        status: "success",
+        metadata: { direction: "naira_transfer_debit", toAccountId },
+      });
+      await activityService.createActivity({
+        userId: freshRecipient.userId.toString(),
+        activityType: "transfer" as any,
+        amount: nairaAmount.toString(),
+        fromToken: "NGN",
+        toToken: "NGN",
+        transactionHash: referenceBase,
+        status: "success",
+        metadata: { direction: "naira_transfer_credit", fromUserId: userId },
+      });
+    });
+
+    res.status(200).json({ success: true, message: "Transfer completed" });
+  } catch (error: any) {
+    console.error("Transfer NGN error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: error.message || "Transfer failed" });
+  } finally {
+    session.endSession();
   }
 };

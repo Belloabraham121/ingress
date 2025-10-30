@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBankAccount } from "@/hooks/useBankAccount";
 import { Button } from "@/components/ui/button";
 import { HbarTransferConfirmationModal } from "@/components/hbar-transfer-confirmation-modal";
+import { NairaTransferModal } from "@/components/naira-transfer-modal";
 import { TokenTransferModal } from "./token-transfer-modal";
 import { getAllTokenBalances } from "@/lib/hedera-utils";
 
@@ -25,6 +26,7 @@ export function WalletCard() {
   const [isLoading, setIsLoading] = useState(true);
   const [showSendHbar, setShowSendHbar] = useState(false);
   const [showTransferHbar, setShowTransferHbar] = useState(false);
+  const [showNairaTransfer, setShowNairaTransfer] = useState(false);
   const [showTokenTransfer, setShowTokenTransfer] = useState(false);
   const [selectedToken, setSelectedToken] = useState<Asset | null>(null);
   const [sendAmount, setSendAmount] = useState("");
@@ -316,9 +318,17 @@ export function WalletCard() {
           <p className="text-xs font-mono text-foreground/50 mb-2">
             NAIRA (NGN)
           </p>
-          <p className="text-2xl font-sentient text-primary">
-            ₦{nairaBalance.toLocaleString()}
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-2xl font-sentient text-primary">
+              ₦{nairaBalance.toLocaleString()}
+            </p>
+            <button
+              onClick={() => setShowNairaTransfer(true)}
+              className="text-xs font-mono text-primary hover:opacity-70 transition-opacity"
+            >
+              [SEND]
+            </button>
+          </div>
         </div>
 
         {/* Total Token Balance - Clickable */}
@@ -445,6 +455,12 @@ export function WalletCard() {
         amount={transferAmount}
         senderAccountId={currentUserAccountId}
         currentBalance={walletBalance.toString()}
+      />
+
+      {/* NGN Transfer Modal */}
+      <NairaTransferModal
+        isOpen={showNairaTransfer}
+        onClose={() => setShowNairaTransfer(false)}
       />
 
       {/* Token Transfer Modal */}

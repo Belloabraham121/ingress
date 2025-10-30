@@ -12,6 +12,7 @@ import {
   PrivateKey,
   ContractId,
 } from "@hashgraph/sdk";
+import { activityService } from "../services/activity.service";
 
 function evmAddressToContractId(evmAddress: string): ContractId {
   const cleanAddress = evmAddress.startsWith("0x")
@@ -667,6 +668,24 @@ export const transferToken = async (
       });
       return;
     }
+
+    // Log activity for token transfer
+    try {
+      await activityService.createActivity({
+        userId,
+        activityType: "transfer" as any,
+        amount: amount.toString(),
+        fromToken: tokenAddress,
+        toToken: tokenAddress,
+        transactionHash: resp.transactionId.toString(),
+        status: "success",
+        metadata: {
+          direction: "token_transfer",
+          to: recipientEvm,
+          decimals,
+        },
+      });
+    } catch {}
 
     res.status(200).json({
       success: true,
