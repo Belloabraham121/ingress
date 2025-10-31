@@ -262,7 +262,7 @@ export default function Home() {
         <div className="container mx-auto max-w-4xl">
           <div className="text-center mb-12">
             <h2 className="text-4xl md:text-5xl font-sentient mb-4">
-              Why Choose Skal Ventures
+              Why Choose Ingress
             </h2>
           </div>
 
@@ -500,7 +500,7 @@ export default function Home() {
           </div>
 
           <div className="border-t border-border pt-8 text-center font-mono text-sm text-foreground/60">
-            <p>&copy; 2025 Skal Ventures. All rights reserved.</p>
+            <p>&copy; 2025 Ingress. All rights reserved.</p>
           </div>
         </div>
       </footer>
