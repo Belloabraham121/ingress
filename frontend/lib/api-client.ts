@@ -117,6 +117,18 @@ export const transactionApi = {
     ),
 };
 
+// ============ Wallet API ============
+
+export const walletApi = {
+  /**
+   * Resolve Hedera account ID to user display name
+   */
+  resolveAccountId: (accountId: string) =>
+    api.get<{ accountId: string; userId: string; name?: string }>(
+      `/api/wallet/resolve/${encodeURIComponent(accountId)}`
+    ),
+};
+
 // ============ Health Check ============
 
 export const healthApi = {

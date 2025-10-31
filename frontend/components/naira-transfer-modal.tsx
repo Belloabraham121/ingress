@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { SuccessModal } from "@/components/success-modal";
+import { useResolveRecipient } from "@/hooks/useResolveRecipient";
 import { bankAccountApi } from "@/lib/api-client";
 
 type NairaTransferModalProps = {
@@ -17,6 +18,11 @@ export function NairaTransferModal({
   const [amount, setAmount] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
+  const {
+    result,
+    loading: resolving,
+    error,
+  } = useResolveRecipient(recipientAccountId);
 
   if (!isOpen) return null;
 
@@ -60,6 +66,24 @@ export function NairaTransferModal({
               value={recipientAccountId}
               onChange={(e) => setRecipientAccountId(e.target.value)}
             />
+            {recipientAccountId && result && (
+              <div className="mt-1 border border-border bg-background text-foreground font-mono text-xs p-2">
+                <div className="flex items-center justify-between">
+                  <span>{result.name || "Unknown user"}</span>
+                  <span className="text-foreground/60">{result.accountId}</span>
+                </div>
+              </div>
+            )}
+            {recipientAccountId && !result && resolving && (
+              <div className="mt-1 border border-border bg-background text-foreground/60 font-mono text-xs p-2">
+                Resolving recipient…
+              </div>
+            )}
+            {recipientAccountId && error && (
+              <div className="mt-1 border border-border bg-background text-red-500 font-mono text-xs p-2">
+                {error}
+              </div>
+            )}
           </div>
           <div>
             <label className="text-xs font-mono text-foreground/60">
