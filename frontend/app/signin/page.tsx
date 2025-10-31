@@ -46,7 +46,7 @@ export default function SignIn() {
           <div className="mb-12 text-center">
             <h1 className="text-4xl md:text-5xl font-sentient mb-4">Sign In</h1>
             <p className="font-mono text-sm text-foreground/60">
-              Access your blockchain investment dashboard
+              Access your Ingress account
             </p>
           </div>
 
