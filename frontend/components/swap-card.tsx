@@ -54,6 +54,8 @@ export function SwapCard() {
   const [toToken, setToToken] = useState<TokenOption>(AVAILABLE_TOKENS[1]); // USDC
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [calculationError, setCalculationError] = useState<string | null>(null);
+  const [usingFallbackRates, setUsingFallbackRates] = useState(false);
 
   const {
     rates,
@@ -74,6 +76,8 @@ export function SwapCard() {
       calculateConversion();
     } else {
       setToAmount("");
+      setCalculationError(null);
+      setUsingFallbackRates(false);
     }
   }, [fromAmount, fromToken, toToken, rates]);
 
@@ -81,6 +85,9 @@ export function SwapCard() {
     if (!fromAmount || !fromToken || !toToken) return;
 
     setIsCalculating(true);
+    setCalculationError(null);
+    setUsingFallbackRates(false);
+
     try {
       const fromAddress = fromToken.address || fromToken.symbol;
       const toAddress = toToken.address || toToken.symbol;
@@ -90,13 +97,46 @@ export function SwapCard() {
         toAddress,
         parseFloat(fromAmount)
       );
+
       if (result) {
         const displayDec = getDisplayDecimals(toToken.symbol);
         const formatted = trimTrailingZeros(result.output.toFixed(displayDec));
         setToAmount(formatted);
+
+        // Check if we're using fallback rates
+        if (result.usingFallback) {
+          setUsingFallbackRates(true);
+          setCalculationError(
+            "Using cached rates due to connection issues. Actual rate may vary."
+          );
+        }
+      } else {
+        // If no result
+        if (rates) {
+          setCalculationError(
+            "Unable to calculate. Please check your connection."
+          );
+        } else {
+          setCalculationError(
+            "Exchange rates not loaded. Please refresh the page."
+          );
+        }
       }
     } catch (error) {
       console.error("Error calculating swap:", error);
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Network error. Please check your connection.";
+
+      setCalculationError(errorMessage);
+
+      // If we have cached rates but calculation failed, inform user
+      if (rates) {
+        setCalculationError(
+          "Network error. Please check your connection and try again."
+        );
+      }
     } finally {
       setIsCalculating(false);
     }
@@ -562,6 +602,23 @@ export function SwapCard() {
                 </div>
               )}
             </div>
+            {/* Error or Warning Messages */}
+            {calculationError && (
+              <div
+                className={`px-3 py-2 text-xs font-mono rounded border ${
+                  usingFallbackRates
+                    ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-600 dark:text-yellow-400"
+                    : "bg-red-500/10 border-red-500/30 text-red-600 dark:text-red-400"
+                }`}
+              >
+                {calculationError}
+                {usingFallbackRates && (
+                  <span className="block mt-1 text-foreground/60">
+                    Estimated value based on cached rates. Actual rate may vary.
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { api, setToken, removeToken } from "@/lib/api";
+import { api, setToken, removeToken, getToken } from "@/lib/api";
 import type {
   RegisterRequest,
   LoginRequest,
@@ -20,7 +20,14 @@ import type {
 export function useAuth() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
   const router = useRouter();
+
+  // Check authentication status on mount
+  useEffect(() => {
+    const token = getToken();
+    setIsAuthenticated(!!token);
+  }, []);
 
   // Register user
   const register = async (data: RegisterRequest) => {
@@ -35,6 +42,12 @@ export function useAuth() {
 
       // Store token
       setToken(response.token);
+      setIsAuthenticated(true);
+
+      // Trigger exchange rates fetch immediately after registration
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("fetchExchangeRates"));
+      }
 
       return response;
     } catch (err: any) {
@@ -55,6 +68,12 @@ export function useAuth() {
 
       // Store token
       setToken(response.token);
+      setIsAuthenticated(true);
+
+      // Trigger exchange rates fetch immediately after login
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("fetchExchangeRates"));
+      }
 
       return response;
     } catch (err: any) {
@@ -163,6 +182,7 @@ export function useAuth() {
       await api.post<{}>("/api/auth/logout");
     } catch {}
     removeToken();
+    setIsAuthenticated(false);
     router.push("/signin");
   };
 
@@ -178,5 +198,6 @@ export function useAuth() {
     isLoading,
     error,
     setError,
+    isAuthenticated,
   };
 }

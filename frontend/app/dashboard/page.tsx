@@ -23,15 +23,24 @@ type TabType = "swap" | "invest" | "stake" | "account" | "profile";
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { logout, getProfile } = useAuth();
+  const { logout, getProfile, isAuthenticated } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>("swap");
   const [userName, setUserName] = useState<string>("");
   const [accountId, setAccountId] = useState<string>("");
   const [evmAddress, setEvmAddress] = useState<string>("");
 
   useEffect(() => {
-    loadProfile();
-  }, []);
+    // Check authentication first
+    if (isAuthenticated === false) {
+      router.push("/signin");
+      return;
+    }
+
+    // Only load profile if authenticated
+    if (isAuthenticated === true) {
+      loadProfile();
+    }
+  }, [isAuthenticated]);
 
   const loadProfile = async () => {
     try {
@@ -70,6 +79,15 @@ export default function DashboardPage() {
     { id: "account", label: "[ACCOUNT & DEPOSITS]" },
     { id: "profile", label: "[PROFILE]" },
   ];
+
+  // Show loading state while checking authentication
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="font-mono text-foreground/60">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">

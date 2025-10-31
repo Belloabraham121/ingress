@@ -5,6 +5,46 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
 const EXCHANGE_CONTRACT = "0x1938C3345f2B6B2Fa3538713DB50f80ebA3a61d5";
 
+// LocalStorage keys
+const RATES_STORAGE_KEY = "exchange_rates";
+const RATES_TIMESTAMP_KEY = "exchange_rates_timestamp";
+const RATES_MAX_AGE = 5 * 60 * 1000; // 5 minutes in milliseconds
+
+// Helper: Load rates from localStorage
+const loadRatesFromStorage = (): ExchangeRates | null => {
+  if (typeof window === "undefined") return null;
+  try {
+    const stored = localStorage.getItem(RATES_STORAGE_KEY);
+    const timestamp = localStorage.getItem(RATES_TIMESTAMP_KEY);
+
+    if (!stored || !timestamp) return null;
+
+    const age = Date.now() - parseInt(timestamp, 10);
+    if (age > RATES_MAX_AGE) {
+      // Rates are stale, remove them
+      localStorage.removeItem(RATES_STORAGE_KEY);
+      localStorage.removeItem(RATES_TIMESTAMP_KEY);
+      return null;
+    }
+
+    return JSON.parse(stored);
+  } catch (error) {
+    console.error("Error loading rates from storage:", error);
+    return null;
+  }
+};
+
+// Helper: Save rates to localStorage
+const saveRatesToStorage = (rates: ExchangeRates): void => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem(RATES_STORAGE_KEY, JSON.stringify(rates));
+    localStorage.setItem(RATES_TIMESTAMP_KEY, Date.now().toString());
+  } catch (error) {
+    console.error("Error saving rates to storage:", error);
+  }
+};
+
 // Token addresses
 const TOKENS = {
   USDC: "0x125D3f690f281659Dd7708D21688BC83Ee534aE6",
@@ -19,6 +59,7 @@ interface ExchangeRates {
 interface SwapCalculation {
   output: number;
   rate: number;
+  usingFallback?: boolean; // Indicates if cached rates were used
 }
 
 interface ExchangeHook {
@@ -55,34 +96,139 @@ interface ExchangeHook {
 }
 
 export const useExchange = (): ExchangeHook => {
-  const [rates, setRates] = useState<ExchangeRates | null>(null);
+  // Initialize with cached rates if available
+  const [rates, setRates] = useState<ExchangeRates | null>(() =>
+    loadRatesFromStorage()
+  );
   const [loadingRates, setLoadingRates] = useState(false);
   const [depositingToken, setDepositingToken] = useState(false);
   const [depositingHbar, setDepositingHbar] = useState(false);
   const [initiatingPayment, setInitiatingPayment] = useState(false);
+
+  // Helper: Fetch with timeout and retry
+  const fetchWithRetry = async (
+    url: string,
+    options: RequestInit,
+    retries = 3,
+    timeout = 10000
+  ): Promise<Response> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error) {
+      clearTimeout(timeoutId);
+      if (
+        retries > 0 &&
+        ((error instanceof Error && error.name === "AbortError") ||
+          error instanceof TypeError)
+      ) {
+        // Retry on timeout or network error with exponential backoff
+        const delay = Math.min(1000 * Math.pow(2, 3 - retries), 5000);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        return fetchWithRetry(url, options, retries - 1, timeout);
+      }
+      throw error;
+    }
+  };
 
   // Fetch exchange rates
   const fetchRates = async () => {
     try {
       setLoadingRates(true);
       const token = getToken();
-      const response = await fetch(`${API_URL}/exchange/rates`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
 
-      const data = await response.json();
-      if (data.success) {
-        setRates(data.data.rates);
-      } else {
-        console.error("Failed to fetch rates:", data.message);
+      try {
+        const response = await fetchWithRetry(
+          `${API_URL}/exchange/rates`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          },
+          3, // 3 retries
+          10000 // 10 second timeout
+        );
+
+        const data = await response.json();
+        if (data.success) {
+          const fetchedRates = data.data.rates;
+          setRates(fetchedRates);
+          // Save to localStorage for offline use
+          saveRatesToStorage(fetchedRates);
+        } else {
+          console.error("Failed to fetch rates:", data.message);
+        }
+      } catch (apiError) {
+        console.error("Error fetching exchange rates:", apiError);
+        // Keep existing rates if available, don't clear them
+        if (!rates) {
+          console.warn("No cached rates available. Rates will be unavailable.");
+        } else {
+          console.warn("Using cached rates due to network issues.");
+        }
       }
     } catch (error) {
-      console.error("Error fetching exchange rates:", error);
+      console.error("Unexpected error fetching exchange rates:", error);
     } finally {
       setLoadingRates(false);
     }
+  };
+
+  // Helper: Calculate swap using cached rates as fallback
+  const calculateSwapFromRates = (
+    fromToken: string,
+    toToken: string,
+    amount: number
+  ): SwapCalculation | null => {
+    if (!rates) return null;
+
+    let fromRate: number | undefined;
+    let toRate: number | undefined;
+
+    // Handle fromToken
+    if (fromToken.toLowerCase() === "hbar") {
+      fromRate = rates.hbar;
+    } else if (fromToken.toLowerCase() === "ngn") {
+      fromRate = 1; // NGN is base currency
+    } else {
+      fromRate = rates[fromToken.toLowerCase()];
+    }
+
+    // Handle toToken
+    if (toToken.toLowerCase() === "hbar") {
+      toRate = rates.hbar;
+    } else if (toToken.toLowerCase() === "ngn") {
+      toRate = 1; // NGN is base currency
+    } else {
+      toRate = rates[toToken.toLowerCase()];
+    }
+
+    if (!fromRate || !toRate) return null;
+
+    // Convert fromToken amount to NGN first, then to toToken
+    let nairaAmount: number;
+    if (fromToken.toLowerCase() === "ngn") {
+      nairaAmount = amount;
+    } else {
+      nairaAmount = amount * fromRate;
+    }
+
+    let output: number;
+    if (toToken.toLowerCase() === "ngn") {
+      output = nairaAmount;
+    } else {
+      output = nairaAmount / toRate;
+    }
+
+    const rate = output / amount;
+    return { output, rate };
   };
 
   // Calculate swap output
@@ -93,22 +239,50 @@ export const useExchange = (): ExchangeHook => {
   ): Promise<SwapCalculation | null> => {
     try {
       const token = getToken();
-      const response = await fetch(`${API_URL}/exchange/calculate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ fromToken, toToken, amount }),
-      });
 
-      const data = await response.json();
-      if (data.success) {
-        return data.data;
+      // Try API call with retry and timeout
+      try {
+        const response = await fetchWithRetry(
+          `${API_URL}/exchange/calculate`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ fromToken, toToken, amount }),
+          },
+          3, // 3 retries
+          10000 // 10 second timeout
+        );
+
+        const data = await response.json();
+        if (data.success) {
+          return { ...data.data, usingFallback: false };
+        }
+      } catch (apiError) {
+        console.warn("API calculation failed, using fallback:", apiError);
+        // Fall through to use cached rates as fallback
       }
+
+      // Fallback: Use cached rates if API fails
+      const fallbackResult = calculateSwapFromRates(fromToken, toToken, amount);
+      if (fallbackResult) {
+        console.log("Using cached rates for calculation");
+        return { ...fallbackResult, usingFallback: true };
+      }
+
       return null;
     } catch (error) {
       console.error("Error calculating swap:", error);
+
+      // Last resort: try fallback calculation
+      const fallbackResult = calculateSwapFromRates(fromToken, toToken, amount);
+      if (fallbackResult) {
+        console.log("Using cached rates as last resort");
+        return { ...fallbackResult, usingFallback: true };
+      }
+
       return null;
     }
   };
@@ -346,13 +520,48 @@ export const useExchange = (): ExchangeHook => {
     return nairaAmount / rate;
   };
 
-  // Fetch rates on mount
+  // Fetch rates on mount and when token becomes available
   useEffect(() => {
     const token = getToken();
     if (token) {
       fetchRates();
     }
   }, []);
+
+  // Listen for storage events (when rates are updated from another tab/window)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === RATES_STORAGE_KEY && e.newValue) {
+        try {
+          const newRates = JSON.parse(e.newValue);
+          setRates(newRates);
+        } catch (error) {
+          console.error("Error parsing rates from storage event:", error);
+        }
+      }
+    };
+
+    window.addEventListener("storage", handleStorageChange);
+    return () => window.removeEventListener("storage", handleStorageChange);
+  }, []);
+
+  // Listen for custom event to trigger rate fetch (e.g., after login)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const handleFetchRatesEvent = () => {
+      const token = getToken();
+      if (token) {
+        fetchRates();
+      }
+    };
+
+    window.addEventListener("fetchExchangeRates", handleFetchRatesEvent);
+    return () =>
+      window.removeEventListener("fetchExchangeRates", handleFetchRatesEvent);
+  }, [fetchRates]);
 
   return {
     // State
