@@ -192,6 +192,15 @@ See folders above for code and deployment artifacts. This README focuses on the 
 
 ---
 
+### Testing
+
+For testing the application, use the following test credentials:
+
+- **Email**: `test@gmail.com`
+- **Password**: `12345678`
+
+---
+
 ### License
 
 This project is provided under an open‑source license. See the repository for details.
