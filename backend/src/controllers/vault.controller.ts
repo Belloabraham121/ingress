@@ -7,6 +7,8 @@ import {
   ContractExecuteTransaction,
   ContractFunctionParameters,
   ContractId,
+  ReceiptStatusError,
+  Status,
 } from "@hashgraph/sdk";
 import { Wallet } from "../models/Wallet";
 import { walletGeneratorService } from "../services/walletGenerator.service";
@@ -138,6 +140,30 @@ export const signApprove = async (
     });
   } catch (error: any) {
     console.error("Error signing approve transaction:", error);
+
+    // Handle contract revert errors specifically
+    if (error instanceof ReceiptStatusError) {
+      const status = error.status;
+
+      // Contract revert executed
+      if (status === Status.ContractRevertExecuted) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Approval failed: The contract rejected the transaction. This may be due to insufficient token balance or other contract constraints.",
+        });
+        return;
+      }
+
+      // Other receipt status errors
+      res.status(400).json({
+        success: false,
+        message: `Transaction failed with status: ${status.toString()}. Please check your token balance and try again.`,
+      });
+      return;
+    }
+
+    // Generic error handling
     res.status(500).json({
       success: false,
       message: error.message || "Failed to sign approve transaction",
@@ -272,6 +298,30 @@ export const signDeposit = async (
     });
   } catch (error: any) {
     console.error("Error signing deposit transaction:", error);
+
+    // Handle contract revert errors specifically
+    if (error instanceof ReceiptStatusError) {
+      const status = error.status;
+
+      // Contract revert executed
+      if (status === Status.ContractRevertExecuted) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Deposit failed: The contract rejected the transaction. This may be due to insufficient token balance, deposit limits, or other contract constraints.",
+        });
+        return;
+      }
+
+      // Other receipt status errors
+      res.status(400).json({
+        success: false,
+        message: `Transaction failed with status: ${status.toString()}. Please check your token balance and try again.`,
+      });
+      return;
+    }
+
+    // Generic error handling
     res.status(500).json({
       success: false,
       message: error.message || "Failed to sign deposit transaction",
@@ -410,6 +460,30 @@ export const signWithdraw = async (
     });
   } catch (error: any) {
     console.error("Error signing withdrawal transaction:", error);
+
+    // Handle contract revert errors specifically
+    if (error instanceof ReceiptStatusError) {
+      const status = error.status;
+
+      // Contract revert executed
+      if (status === Status.ContractRevertExecuted) {
+        res.status(400).json({
+          success: false,
+          message:
+            "Withdrawal failed: The contract rejected the transaction. This may be due to insufficient balance in the vault, withdrawal limits, or other contract constraints.",
+        });
+        return;
+      }
+
+      // Other receipt status errors
+      res.status(400).json({
+        success: false,
+        message: `Transaction failed with status: ${status.toString()}. Please check your vault balance and try again.`,
+      });
+      return;
+    }
+
+    // Generic error handling
     res.status(500).json({
       success: false,
       message: error.message || "Failed to sign withdrawal transaction",
