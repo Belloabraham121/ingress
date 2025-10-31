@@ -597,28 +597,9 @@ class ExchangeService {
         },
       });
 
-      // Decrease user's NGN balance since funds were used to buy tokens
-      try {
-        const bankAccount = await BankAccount.findOne({ userId });
-        if (bankAccount) {
-          const oldBalance = bankAccount.balance || 0;
-          const newBalance = Math.max(0, oldBalance - nairaAmount);
-          bankAccount.balance = newBalance;
-          await bankAccount.save();
-          console.log(
-            `✅ NGN balance debited: ₦${oldBalance} → ₦${newBalance}`
-          );
-        } else {
-          console.warn(
-            "⚠️ Bank account not found when debiting NGN for naira_to_token"
-          );
-        }
-      } catch (debitErr) {
-        console.error(
-          "❌ Failed to debit NGN balance for naira_to_token:",
-          debitErr
-        );
-      }
+      // Note: NGN balance deduction is handled in the webhook controller
+      // (webhook.controller.ts handleChargeSuccess) to ensure it happens
+      // atomically with the transaction processing
 
       return { success: true, txId: txResponse.transactionId.toString() };
     } catch (error) {
@@ -731,28 +712,9 @@ class ExchangeService {
         },
       });
 
-      // Decrease user's NGN balance since funds were used to buy HBAR
-      try {
-        const bankAccount = await BankAccount.findOne({ userId });
-        if (bankAccount) {
-          const oldBalance = bankAccount.balance || 0;
-          const newBalance = Math.max(0, oldBalance - nairaAmount);
-          bankAccount.balance = newBalance;
-          await bankAccount.save();
-          console.log(
-            `✅ NGN balance debited: ₦${oldBalance} → ₦${newBalance}`
-          );
-        } else {
-          console.warn(
-            "⚠️ Bank account not found when debiting NGN for naira_to_hbar"
-          );
-        }
-      } catch (debitErr) {
-        console.error(
-          "❌ Failed to debit NGN balance for naira_to_hbar:",
-          debitErr
-        );
-      }
+      // Note: NGN balance deduction is handled in the webhook controller
+      // (webhook.controller.ts handleChargeSuccess) to ensure it happens
+      // atomically with the transaction processing
 
       return { success: true, txId: txResponse.transactionId.toString() };
     } catch (error) {
