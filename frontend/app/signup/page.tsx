@@ -85,7 +85,7 @@ export default function SignUp() {
                   Create Account
                 </h1>
                 <p className="font-mono text-sm text-foreground/60">
-                  Join Ingress and start investing
+                  Join Ingress
                 </p>
               </div>
 
