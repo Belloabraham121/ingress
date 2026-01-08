@@ -106,6 +106,41 @@ contract Exchange is ReentrancyGuard, Ownable {
     }
 
     /**
+     * @dev Add token liquidity to the pool (only owner or authorized withdrawer)
+     * @param token Address of the ERC20 token to add
+     * @param amount Amount of tokens to add as liquidity
+     */
+    function addTokenLiquidity(
+        address token,
+        uint256 amount
+    ) external nonReentrant {
+        if (msg.sender != owner() && msg.sender != authorizedWithdrawer) {
+            revert UnauthorizedWithdrawal();
+        }
+        if (token == address(0)) revert InvalidToken();
+        if (amount == 0) revert InvalidAmount();
+
+        IERC20 tokenContract = IERC20(token);
+
+        // Transfer tokens from sender to contract (not tracked per user)
+        tokenContract.safeTransferFrom(msg.sender, address(this), amount);
+
+        emit TokenDeposited(address(0), token, amount);
+    }
+
+    /**
+     * @dev Add HBAR liquidity to the pool (only owner or authorized withdrawer)
+     */
+    function addHbarLiquidity() external payable nonReentrant {
+        if (msg.sender != owner() && msg.sender != authorizedWithdrawer) {
+            revert UnauthorizedWithdrawal();
+        }
+        if (msg.value == 0) revert InvalidAmount();
+
+        emit HbarDeposited(address(0), msg.value);
+    }
+
+    /**
      * @dev Withdraw ERC20 tokens to a specific address (only authorized withdrawer)
      * @param token Address of the ERC20 token to withdraw
      * @param to Address to send tokens to

@@ -1,103 +1,163 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Logo } from "@/components/logo"
-import { Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area } from "recharts"
-import { ChartSkeleton, TableSkeleton, SummaryCardsSkeleton } from "@/components/chart-skeleton"
-
-const performanceData = [
-  { month: "Jan", value: 8000, deposited: 8000 },
-  { month: "Feb", value: 8520, deposited: 8000 },
-  { month: "Mar", value: 9350, deposited: 11500 },
-  { month: "Apr", value: 10120, deposited: 11500 },
-  { month: "May", value: 10890, deposited: 11500 },
-  { month: "Jun", value: 11750, deposited: 13250 },
-  { month: "Jul", value: 12680, deposited: 13250 },
-]
-
-interface VaultPosition {
-  id: string
-  vaultName: string
-  symbol: string
-  depositAmount: string
-  apy: number
-  realTimeApy: number
-  projectedAnnualReturn: string
-  currentValue: string
-  gainLoss: string
-  gainLossPercent: number
-  depositDate: string
-}
-
-const vaultPositions: VaultPosition[] = [
-  {
-    id: "1",
-    vaultName: "USDT Vault",
-    symbol: "USDT",
-    depositAmount: "$2,000",
-    apy: 12.5,
-    realTimeApy: 12.8,
-    projectedAnnualReturn: "$250",
-    currentValue: "$2,085",
-    gainLoss: "$85",
-    gainLossPercent: 4.25,
-    depositDate: "Jan 15, 2024",
-  },
-  {
-    id: "2",
-    vaultName: "USDC Vault",
-    symbol: "USDC",
-    depositAmount: "$4,200",
-    apy: 11.8,
-    realTimeApy: 11.9,
-    projectedAnnualReturn: "$495.60",
-    currentValue: "$4,650",
-    gainLoss: "$450",
-    gainLossPercent: 10.71,
-    depositDate: "Feb 20, 2024",
-  },
-  {
-    id: "3",
-    vaultName: "ETH Vault",
-    symbol: "ETH",
-    depositAmount: "$6,250",
-    apy: 8.2,
-    realTimeApy: 8.3,
-    projectedAnnualReturn: "$512.50",
-    currentValue: "$7,715",
-    gainLoss: "$1,465",
-    gainLossPercent: 23.44,
-    depositDate: "Mar 10, 2024",
-  },
-]
+import Link from "next/link";
+import { useState, useEffect, useMemo } from "react";
+import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/logo";
+import {
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  Line,
+} from "recharts";
+import {
+  ChartSkeleton,
+  TableSkeleton,
+  SummaryCardsSkeleton,
+} from "@/components/chart-skeleton";
+import { useUserVaultPositions } from "@/hooks/useUserVaultPositions";
+import { useAuth } from "@/hooks/useAuth";
+import { getEvmAddressFromAccountId } from "@/lib/hedera-utils";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function InvestmentsPage() {
-  const [isLoading, setIsLoading] = useState(true)
+  const { getProfile } = useAuth();
+  const [userEvmAddress, setUserEvmAddress] = useState<string | undefined>();
+  const { positions, summary, isLoading, error, refresh } =
+    useUserVaultPositions(userEvmAddress);
 
   useEffect(() => {
-    // Simulate data loading delay
-    const timer = setTimeout(() => setIsLoading(false), 1500)
-    return () => clearTimeout(timer)
-  }, [])
+    loadUserAddress();
+  }, []);
 
-  const totalDeposited = vaultPositions.reduce((sum, pos) => {
-    const value = Number.parseFloat(pos.depositAmount.replace("$", "").replace(",", ""))
-    return sum + value
-  }, 0)
+  const loadUserAddress = async () => {
+    try {
+      const profile = await getProfile();
+      if (profile?.wallet?.accountId) {
+        // Get EVM address from Hedera account ID via mirror node
+        const evmAddress = await getEvmAddressFromAccountId(
+          profile.wallet.accountId
+        );
+        setUserEvmAddress(evmAddress);
+      }
+    } catch (err) {
+      console.error("Failed to load user EVM address:", err);
+    }
+  };
 
-  const totalCurrentValue = vaultPositions.reduce((sum, pos) => {
-    const value = Number.parseFloat(pos.currentValue.replace("$", "").replace(",", ""))
-    return sum + value
-  }, 0)
+  const formatNumber = (value: string, decimals: number = 2): string => {
+    const num = parseFloat(value);
+    if (isNaN(num)) return "0.00";
+    return num.toLocaleString("en-US", {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  };
 
-  const totalGainLoss = vaultPositions.reduce((sum, pos) => {
-    const value = Number.parseFloat(pos.gainLoss.replace("$", "").replace(",", ""))
-    return sum + value
-  }, 0)
+  const formatDate = (date: Date): string => {
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+  };
 
-  const totalGainLossPercent = ((totalGainLoss / totalDeposited) * 100).toFixed(2)
+  // Calculate totals
+  const totalDeposited = parseFloat(summary?.totalDeposited || "0");
+  const totalCurrentValue = parseFloat(summary?.totalCurrentValue || "0");
+  const totalGainLoss = totalCurrentValue - totalDeposited;
+  const totalGainLossPercent =
+    totalDeposited > 0 ? (totalGainLoss / totalDeposited) * 100 : 0;
+
+  // Generate performance data for chart
+  const performanceData = useMemo(() => {
+    if (positions.length === 0) {
+      return [{ month: "Now", value: 0, deposited: 0 }];
+    }
+
+    const currentDeposit = parseFloat(summary?.totalDeposited || "0");
+    const currentValue = parseFloat(summary?.totalCurrentValue || "0");
+
+    // Find earliest deposit date from actual contract data
+    const earliestDeposit = positions.reduce((earliest, pos) => {
+      return pos.depositTime < earliest ? pos.depositTime : earliest;
+    }, positions[0]?.depositTime || new Date());
+
+    const now = new Date();
+    const daysSinceDeposit = Math.floor(
+      (now.getTime() - earliestDeposit.getTime()) / (1000 * 60 * 60 * 24)
+    );
+
+    // Calculate weighted average APY from all positions
+    const totalDeposits = positions.reduce(
+      (sum, pos) => sum + parseFloat(pos.depositAmount),
+      0
+    );
+    const weightedAPY =
+      positions.reduce((sum, pos) => {
+        const weight = parseFloat(pos.depositAmount) / totalDeposits;
+        return sum + pos.apy * weight;
+      }, 0) / 100;
+
+    // Helper to calculate future value with compound interest
+    const calculateFutureValue = (daysFromNow: number) => {
+      const years = (daysSinceDeposit + daysFromNow) / 365;
+      return currentDeposit * Math.pow(1 + weightedAPY, years);
+    };
+
+    // Format date labels
+    const formatDateLabel = (date: Date) => {
+      return date.toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      });
+    };
+
+    const futureDate = (days: number) => {
+      const date = new Date(now);
+      date.setDate(date.getDate() + days);
+      return formatDateLabel(date);
+    };
+
+    return [
+      {
+        month: formatDateLabel(earliestDeposit),
+        value: currentDeposit,
+        deposited: currentDeposit,
+      },
+      {
+        month: "Now",
+        value: currentValue,
+        deposited: currentDeposit,
+      },
+      {
+        month: futureDate(30),
+        value: calculateFutureValue(30),
+        deposited: currentDeposit,
+      },
+      {
+        month: futureDate(90),
+        value: calculateFutureValue(90),
+        deposited: currentDeposit,
+      },
+      {
+        month: futureDate(180),
+        value: calculateFutureValue(180),
+        deposited: currentDeposit,
+      },
+      {
+        month: futureDate(365),
+        value: calculateFutureValue(365),
+        deposited: currentDeposit,
+      },
+    ];
+  }, [positions, summary]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -108,10 +168,14 @@ export default function InvestmentsPage() {
         </Link>
         <div className="flex gap-3">
           <Link href="/staking">
-            <Button variant="outline">[View Staking]</Button>
+            <button className="px-6 py-3 border border-border bg-background text-foreground font-mono text-sm font-medium transition-all duration-300 hover:border-primary hover:bg-primary/10">
+              [View Staking]
+            </button>
           </Link>
           <Link href="/dashboard">
-            <Button variant="outline">[Back to Dashboard]</Button>
+            <button className="px-6 py-3 border border-border bg-background text-foreground font-mono text-sm font-medium transition-all duration-300 hover:border-primary hover:bg-primary/10">
+              [Back to Dashboard]
+            </button>
           </Link>
         </div>
       </div>
@@ -124,35 +188,68 @@ export default function InvestmentsPage() {
               Token <i className="font-light">Vault System</i>
             </h1>
             <p className="font-mono text-sm text-foreground/60 max-w-[500px]">
-              Deposit your tokens into secure vaults and earn real-time APY rewards with flexible withdrawal options
+              Deposit your tokens into secure vaults and earn real-time APY
+              rewards with flexible withdrawal options
             </p>
           </div>
 
           {/* Summary Cards */}
           {isLoading ? (
             <SummaryCardsSkeleton count={4} className="mb-12" />
+          ) : error ? (
+            <Alert variant="destructive" className="mb-12">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="font-mono text-sm">
+                {error}
+              </AlertDescription>
+            </Alert>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-12">
               <div className="border border-border bg-background p-6">
-                <p className="text-xs font-mono text-foreground/60 mb-2">TOTAL DEPOSITED</p>
-                <p className="text-2xl font-sentient text-primary">${totalDeposited.toFixed(2)}</p>
-              </div>
-              <div className="border border-border bg-background p-6">
-                <p className="text-xs font-mono text-foreground/60 mb-2">CURRENT VALUE</p>
-                <p className="text-2xl font-sentient text-primary">${totalCurrentValue.toFixed(2)}</p>
-              </div>
-              <div className="border border-border bg-background p-6">
-                <p className="text-xs font-mono text-foreground/60 mb-2">TOTAL GAIN/LOSS</p>
-                <p className={`text-2xl font-sentient ${totalGainLoss >= 0 ? "text-green-500" : "text-red-500"}`}>
-                  ${totalGainLoss.toFixed(2)}
+                <p className="text-xs font-mono text-foreground/60 mb-2">
+                  TOTAL DEPOSITED
+                </p>
+                <p className="text-2xl font-sentient text-primary">
+                  {formatNumber(summary?.totalDeposited || "0", 2)}{" "}
+                  {positions[0]?.symbol || ""}
                 </p>
               </div>
               <div className="border border-border bg-background p-6">
-                <p className="text-xs font-mono text-foreground/60 mb-2">RETURN %</p>
+                <p className="text-xs font-mono text-foreground/60 mb-2">
+                  CURRENT VALUE
+                </p>
+                <p className="text-2xl font-sentient text-primary">
+                  {formatNumber(summary?.totalCurrentValue || "0", 2)}{" "}
+                  {positions[0]?.symbol || ""}
+                </p>
+              </div>
+              <div className="border border-border bg-background p-6">
+                <p className="text-xs font-mono text-foreground/60 mb-2">
+                  TOTAL GAIN/LOSS
+                </p>
                 <p
-                  className={`text-2xl font-sentient ${Number(totalGainLossPercent) >= 0 ? "text-green-500" : "text-red-500"}`}
+                  className={`text-2xl font-sentient ${
+                    totalGainLoss >= 0 ? "text-green-500" : "text-red-500"
+                  }`}
                 >
-                  {totalGainLossPercent}%
+                  {totalGainLoss >= 0 ? "+" : ""}
+                  {formatNumber(totalGainLoss.toString(), 2)}{" "}
+                  {positions[0]?.symbol || ""}
+                </p>
+              </div>
+              <div className="border border-border bg-background p-6">
+                <p className="text-xs font-mono text-foreground/60 mb-2">
+                  RETURN %
+                </p>
+                <p
+                  className={`text-2xl font-sentient ${
+                    totalGainLossPercent >= 0
+                      ? "text-green-500"
+                      : "text-red-500"
+                  }`}
+                >
+                  {totalGainLossPercent >= 0 ? "+" : ""}
+                  {totalGainLossPercent.toFixed(2)}%
                 </p>
               </div>
             </div>
@@ -160,17 +257,56 @@ export default function InvestmentsPage() {
 
           {/* Performance Chart */}
           <div className="border border-border bg-background p-6 mb-12">
-            <h2 className="text-lg font-sentient mb-6">VAULT PERFORMANCE</h2>
+            <div className="flex items-start justify-between mb-6">
+              <h2 className="text-lg font-sentient">VAULT PERFORMANCE</h2>
+              {!isLoading && !error && (
+                <button
+                  onClick={refresh}
+                  className="p-2 hover:bg-foreground/5 transition-colors"
+                  title="Refresh"
+                >
+                  <RefreshCw className="w-4 h-4 text-foreground/60" />
+                </button>
+              )}
+            </div>
             {isLoading ? (
               <ChartSkeleton height="h-[400px]" showLegend={true} />
+            ) : positions.length === 0 ? (
+              <div className="h-[400px] flex items-center justify-center border border-border/50">
+                <div className="text-center space-y-2">
+                  <p className="text-sm font-mono text-foreground/60">
+                    No vault positions yet
+                  </p>
+                  <p className="text-xs font-mono text-foreground/40">
+                    Deposit to a vault to see performance charts
+                  </p>
+                </div>
+              </div>
             ) : (
               <div className="w-full h-[400px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={performanceData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                  <AreaChart
+                    data={performanceData}
+                    margin={{ top: 10, right: 30, left: 0, bottom: 0 }}
+                  >
                     <defs>
-                      <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#FFC700" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="#FFC700" stopOpacity={0} />
+                      <linearGradient
+                        id="colorValue"
+                        x1="0"
+                        y1="0"
+                        x2="0"
+                        y2="1"
+                      >
+                        <stop
+                          offset="5%"
+                          stopColor="#FFC700"
+                          stopOpacity={0.3}
+                        />
+                        <stop
+                          offset="95%"
+                          stopColor="#FFC700"
+                          stopOpacity={0}
+                        />
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="#424242" />
@@ -210,47 +346,105 @@ export default function InvestmentsPage() {
             <h2 className="text-lg font-sentient mb-6">VAULT DETAILS</h2>
             {isLoading ? (
               <TableSkeleton rows={3} columns={8} />
+            ) : positions.length === 0 ? (
+              <div className="border border-border/50 p-8 text-center space-y-2">
+                <p className="text-sm font-mono text-foreground/60">
+                  No active vault positions
+                </p>
+                <p className="text-xs font-mono text-foreground/40">
+                  Deposit to a vault to start earning rewards
+                </p>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm font-mono">
                   <thead>
                     <tr className="border-b border-border/50">
-                      <th className="text-left p-3 text-foreground/60 font-medium">VAULT</th>
-                      <th className="text-right p-3 text-foreground/60 font-medium">DEPOSITED</th>
-                      <th className="text-right p-3 text-foreground/60 font-medium">CURRENT VALUE</th>
-                      <th className="text-right p-3 text-foreground/60 font-medium">GAIN/LOSS</th>
-                      <th className="text-right p-3 text-foreground/60 font-medium">RETURN %</th>
-                      <th className="text-right p-3 text-foreground/60 font-medium">APY</th>
-                      <th className="text-right p-3 text-foreground/60 font-medium">REAL-TIME APY</th>
-                      <th className="text-right p-3 text-foreground/60 font-medium">DEPOSIT DATE</th>
+                      <th className="text-left p-3 text-foreground/60 font-medium">
+                        VAULT
+                      </th>
+                      <th className="text-right p-3 text-foreground/60 font-medium">
+                        DEPOSITED
+                      </th>
+                      <th className="text-right p-3 text-foreground/60 font-medium">
+                        CURRENT VALUE
+                      </th>
+                      <th className="text-right p-3 text-foreground/60 font-medium">
+                        GAIN/LOSS
+                      </th>
+                      <th className="text-right p-3 text-foreground/60 font-medium">
+                        RETURN %
+                      </th>
+                      <th className="text-right p-3 text-foreground/60 font-medium">
+                        APY
+                      </th>
+                      <th className="text-right p-3 text-foreground/60 font-medium">
+                        PENDING REWARDS
+                      </th>
+                      <th className="text-right p-3 text-foreground/60 font-medium">
+                        DEPOSIT DATE
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {vaultPositions.map((position) => (
-                      <tr key={position.id} className="border-b border-border/50 hover:bg-primary/5 transition-colors">
-                        <td className="p-3 text-foreground">
-                          <div>
-                            <p className="font-medium">{position.vaultName}</p>
-                            <p className="text-xs text-foreground/50">{position.symbol}</p>
-                          </div>
-                        </td>
-                        <td className="text-right p-3 text-foreground">{position.depositAmount}</td>
-                        <td className="text-right p-3 text-foreground">{position.currentValue}</td>
-                        <td
-                          className={`text-right p-3 font-bold ${Number(position.gainLoss.replace("$", "")) >= 0 ? "text-green-500" : "text-red-500"}`}
+                    {positions.map((position) => {
+                      const deposited = parseFloat(position.depositAmount);
+                      const currentVal = parseFloat(position.currentValue);
+                      const gainLoss = currentVal - deposited;
+                      const returnPercent =
+                        deposited > 0 ? (gainLoss / deposited) * 100 : 0;
+
+                      return (
+                        <tr
+                          key={position.vaultAddress}
+                          className="border-b border-border/50 hover:bg-primary/5 transition-colors"
                         >
-                          {position.gainLoss}
-                        </td>
-                        <td
-                          className={`text-right p-3 font-bold ${position.gainLossPercent >= 0 ? "text-green-500" : "text-red-500"}`}
-                        >
-                          {position.gainLossPercent.toFixed(2)}%
-                        </td>
-                        <td className="text-right p-3 text-primary font-bold">{position.apy}%</td>
-                        <td className="text-right p-3 text-green-500 font-bold">{position.realTimeApy}%</td>
-                        <td className="text-right p-3 text-foreground/60">{position.depositDate}</td>
-                      </tr>
-                    ))}
+                          <td className="p-3 text-foreground">
+                            <div>
+                              <p className="font-medium">
+                                {position.vaultName}
+                              </p>
+                              <p className="text-xs text-foreground/50">
+                                {position.symbol}
+                              </p>
+                            </div>
+                          </td>
+                          <td className="text-right p-3 text-foreground">
+                            {formatNumber(position.depositAmount, 4)}
+                          </td>
+                          <td className="text-right p-3 text-foreground">
+                            {formatNumber(position.currentValue, 4)}
+                          </td>
+                          <td
+                            className={`text-right p-3 font-bold ${
+                              gainLoss >= 0 ? "text-green-500" : "text-red-500"
+                            }`}
+                          >
+                            {gainLoss >= 0 ? "+" : ""}
+                            {formatNumber(gainLoss.toString(), 4)}
+                          </td>
+                          <td
+                            className={`text-right p-3 font-bold ${
+                              returnPercent >= 0
+                                ? "text-green-500"
+                                : "text-red-500"
+                            }`}
+                          >
+                            {returnPercent >= 0 ? "+" : ""}
+                            {returnPercent.toFixed(2)}%
+                          </td>
+                          <td className="text-right p-3 text-primary font-bold">
+                            {position.apy}%
+                          </td>
+                          <td className="text-right p-3 text-green-500 font-bold">
+                            +{formatNumber(position.pendingRewards, 4)}
+                          </td>
+                          <td className="text-right p-3 text-foreground/60">
+                            {formatDate(position.depositTime)}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -263,7 +457,10 @@ export default function InvestmentsPage() {
             {isLoading ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {Array.from({ length: 3 }).map((_, i) => (
-                  <div key={`skeleton-${i}`} className="border border-border bg-background p-6">
+                  <div
+                    key={`skeleton-${i}`}
+                    className="border border-border bg-background p-6"
+                  >
                     <div className="h-6 w-32 rounded bg-gradient-to-r from-border/20 to-border/40 mb-4 animate-pulse" />
                     <div className="space-y-3">
                       {Array.from({ length: 5 }).map((_, j) => (
@@ -276,58 +473,101 @@ export default function InvestmentsPage() {
                   </div>
                 ))}
               </div>
+            ) : positions.length === 0 ? (
+              <div className="border border-border/50 p-8 text-center space-y-2">
+                <p className="text-sm font-mono text-foreground/60">
+                  No active vault positions
+                </p>
+                <p className="text-xs font-mono text-foreground/40">
+                  Deposit to a vault to start earning rewards
+                </p>
+              </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {vaultPositions.map((position) => (
-                  <div
-                    key={position.id}
-                    className="border border-border bg-background p-6 hover:border-primary/50 transition-colors"
-                  >
-                    <h3 className="text-base font-sentient mb-4">{position.vaultName}</h3>
-                    <div className="space-y-3 font-mono text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-foreground/60">Token:</span>
-                        <span className="text-foreground font-medium">{position.symbol}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-foreground/60">Deposited:</span>
-                        <span className="text-foreground">{position.depositAmount}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-foreground/60">Current Value:</span>
-                        <span className="text-foreground">{position.currentValue}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-foreground/60">Gain/Loss:</span>
-                        <span
-                          className={
-                            Number(position.gainLoss.replace("$", "")) >= 0 ? "text-green-500" : "text-red-500"
-                          }
-                        >
-                          {position.gainLoss}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-foreground/60">Return:</span>
-                        <span className={position.gainLossPercent >= 0 ? "text-green-500" : "text-red-500"}>
-                          {position.gainLossPercent.toFixed(2)}%
-                        </span>
-                      </div>
-                      <div className="border-t border-border/50 pt-3 flex justify-between">
-                        <span className="text-foreground/60">APY:</span>
-                        <span className="text-primary font-bold">{position.apy}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-foreground/60">Real-time APY:</span>
-                        <span className="text-green-500 font-bold">{position.realTimeApy}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-foreground/60">Deposited:</span>
-                        <span className="text-foreground/80">{position.depositDate}</span>
+                {positions.map((position) => {
+                  const deposited = parseFloat(position.depositAmount);
+                  const currentVal = parseFloat(position.currentValue);
+                  const gainLoss = currentVal - deposited;
+                  const returnPercent =
+                    deposited > 0 ? (gainLoss / deposited) * 100 : 0;
+
+                  return (
+                    <div
+                      key={position.vaultAddress}
+                      className="border border-border bg-background p-6 hover:border-primary/50 transition-colors"
+                    >
+                      <h3 className="text-base font-sentient mb-4">
+                        {position.vaultName}
+                      </h3>
+                      <div className="space-y-3 font-mono text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-foreground/60">Token:</span>
+                          <span className="text-foreground font-medium">
+                            {position.symbol}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-foreground/60">Deposited:</span>
+                          <span className="text-foreground">
+                            {formatNumber(position.depositAmount, 4)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-foreground/60">
+                            Current Value:
+                          </span>
+                          <span className="text-foreground">
+                            {formatNumber(position.currentValue, 4)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-foreground/60">Gain/Loss:</span>
+                          <span
+                            className={
+                              gainLoss >= 0 ? "text-green-500" : "text-red-500"
+                            }
+                          >
+                            {gainLoss >= 0 ? "+" : ""}
+                            {formatNumber(gainLoss.toString(), 4)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-foreground/60">Return:</span>
+                          <span
+                            className={
+                              returnPercent >= 0
+                                ? "text-green-500"
+                                : "text-red-500"
+                            }
+                          >
+                            {returnPercent >= 0 ? "+" : ""}
+                            {returnPercent.toFixed(2)}%
+                          </span>
+                        </div>
+                        <div className="border-t border-border/50 pt-3 flex justify-between">
+                          <span className="text-foreground/60">APY:</span>
+                          <span className="text-primary font-bold">
+                            {position.apy}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-foreground/60">
+                            Pending Rewards:
+                          </span>
+                          <span className="text-green-500 font-bold">
+                            +{formatNumber(position.pendingRewards, 4)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-foreground/60">Deposited:</span>
+                          <span className="text-foreground/80">
+                            {formatDate(position.depositTime)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -335,12 +575,18 @@ export default function InvestmentsPage() {
           {/* Action Buttons */}
           <div className="flex gap-4 justify-center">
             <Link href="/dashboard">
-              <Button variant="outline">[BACK TO DASHBOARD]</Button>
+              <button className="px-6 py-3 border border-border bg-background text-foreground font-mono text-sm font-medium transition-all duration-300 hover:border-primary hover:bg-primary/10">
+                [BACK TO DASHBOARD]
+              </button>
             </Link>
-            <Button>[DEPOSIT TO VAULT]</Button>
+            <Link href="/dashboard">
+              <button className="px-6 py-3 border border-primary bg-primary/10 text-primary font-mono text-sm font-medium transition-all duration-300 hover:bg-primary/20">
+                [DEPOSIT TO VAULT]
+              </button>
+            </Link>
           </div>
         </div>
       </main>
     </div>
-  )
+  );
 }
