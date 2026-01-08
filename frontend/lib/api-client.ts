@@ -94,6 +94,15 @@ export const bankAccountApi = {
    */
   refreshBalance: () =>
     api.post<RefreshBalanceResponse>("/api/bank-account/refresh-balance"),
+
+  /**
+   * Internal NGN transfer between users by Hedera Account ID
+   */
+  transfer: (toAccountId: string, amount: number) =>
+    api.post<{ message: string }>("/api/bank-account/transfer", {
+      toAccountId,
+      amount,
+    }),
 };
 
 // ============ Transaction API ============

@@ -8,7 +8,8 @@ export interface CreateActivityData {
     | "invest"
     | "stake"
     | "withdraw_vault"
-    | "withdraw_stake";
+    | "withdraw_stake"
+    | "transfer";
   amount: string;
   tokenSymbol?: string;
   fromToken?: string;
@@ -32,7 +33,8 @@ export interface GetActivitiesOptions {
     | "invest"
     | "stake"
     | "withdraw_vault"
-    | "withdraw_stake";
+    | "withdraw_stake"
+    | "transfer";
 }
 
 export interface PaginatedActivities {

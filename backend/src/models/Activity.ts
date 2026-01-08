@@ -7,7 +7,8 @@ export interface IActivity extends Document {
     | "invest"
     | "stake"
     | "withdraw_vault"
-    | "withdraw_stake";
+    | "withdraw_stake"
+    | "transfer";
   amount: string;
   tokenSymbol?: string;
   fromToken?: string;
@@ -34,7 +35,14 @@ const ActivitySchema: Schema = new Schema(
     },
     activityType: {
       type: String,
-      enum: ["swap", "invest", "stake", "withdraw_vault", "withdraw_stake"],
+      enum: [
+        "swap",
+        "invest",
+        "stake",
+        "withdraw_vault",
+        "withdraw_stake",
+        "transfer",
+      ],
       required: [true, "Activity type is required"],
       index: true,
     },

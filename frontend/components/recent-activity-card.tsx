@@ -109,6 +109,11 @@ export function RecentActivityCard({
           activity.tokenSymbol || "tokens"
         } from ${activity.poolName || "Pool"}`;
       case "swap":
+        if (activity.metadata?.direction === "token_transfer") {
+          return `Sent ${formattedAmount} ${resolveTokenLabel(
+            activity.fromToken
+          )} to ${activity.metadata?.to || "recipient"}`;
+        }
         return `Swapped ${formattedAmount} ${resolveTokenLabel(
           activity.fromToken
         )} for ${resolveTokenLabel(activity.toToken)}`;

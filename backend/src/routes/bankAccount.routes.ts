@@ -5,6 +5,7 @@ import {
   getAccountBalance,
   getAvailableBanks,
   refreshBalance,
+  transferNaira,
 } from "../controllers/bankAccount.controller";
 import { protect } from "../middleware/auth.middleware";
 
@@ -16,5 +17,6 @@ router.get("/details", protect, getBankAccountDetails);
 router.get("/balance", protect, getAccountBalance);
 router.get("/banks", protect, getAvailableBanks);
 router.post("/refresh-balance", protect, refreshBalance);
+router.post("/transfer", protect, transferNaira);
 
 export default router;
