@@ -4,6 +4,7 @@ import {
   signDeposit,
   signWithdraw,
   getAllowance,
+  getUserBalance,
 } from "../controllers/vault.controller";
 import { protect as authenticate } from "../middleware/auth.middleware";
 
@@ -36,5 +37,12 @@ router.post("/sign-withdraw", authenticate, signWithdraw);
  * @access  Private
  */
 router.get("/allowance", authenticate, getAllowance);
+
+/**
+ * @route   GET /api/vault/user-balance
+ * @desc    Get user's balance in a vault
+ * @access  Private
+ */
+router.get("/user-balance", authenticate, getUserBalance);
 
 export default router;

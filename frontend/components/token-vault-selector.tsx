@@ -13,6 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertCircle, RefreshCw, CheckCircle2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { api } from "@/lib/api";
 
 interface TokenVault {
   id: string;
@@ -60,6 +61,10 @@ export function TokenVaultSelector() {
     currentBalance: "0",
   });
 
+  // Store user vault balance
+  const [userVaultBalance, setUserVaultBalance] = useState<string>("0");
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+
   // Convert blockchain vaults to TokenVault format
   const tokenVaults: TokenVault[] = useMemo(() => {
     if (!vaults || vaults.length === 0) return [];
@@ -88,6 +93,44 @@ export function TokenVaultSelector() {
       setSelectedVault(tokenVaults[0].id);
     }
   }, [tokenVaults, selectedVault]);
+
+  // Fetch user vault balance when vault is selected
+  const fetchUserVaultBalance = async (vaultAddress: string) => {
+    if (!vaultAddress) {
+      setUserVaultBalance("0");
+      return;
+    }
+
+    setIsLoadingBalance(true);
+    try {
+      const response = await api.get<{
+        depositAmount: string;
+        currentValue: string;
+        pendingRewards: string;
+        formattedDepositAmount: string;
+        formattedCurrentValue: string;
+        formattedPendingRewards: string;
+      }>(`/api/vault/user-balance?vaultAddress=${vaultAddress}`);
+
+      // Use currentValue which includes deposit + pending rewards
+      setUserVaultBalance(response.formattedCurrentValue);
+    } catch (err: any) {
+      console.error("Failed to fetch user vault balance:", err);
+      // Set to 0 if error (user might not have any deposit)
+      setUserVaultBalance("0");
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  };
+
+  // Fetch balance when vault selection changes
+  useEffect(() => {
+    if (selectedVault) {
+      fetchUserVaultBalance(selectedVault);
+    } else {
+      setUserVaultBalance("0");
+    }
+  }, [selectedVault]);
 
   const selected = tokenVaults.find((vault) => vault.id === selectedVault);
 
@@ -142,6 +185,10 @@ export function TokenVaultSelector() {
       if (result.success && result.txHash) {
         // Refresh vault data after successful deposit
         refresh();
+        // Refresh user balance
+        if (selected?.vaultAddress) {
+          await fetchUserVaultBalance(selected.vaultAddress);
+        }
         // Clear deposit amount and close confirmation
         setDepositAmount("");
         return { success: true, txHash: result.txHash };
@@ -164,25 +211,45 @@ export function TokenVaultSelector() {
     }
   };
 
-  const handleWithdrawClick = () => {
+  const handleWithdrawClick = async () => {
     if (!selected || !withdrawAmount) return;
 
     // Clear any previous errors
     setWithdrawError(null);
 
-    // Get current balance from vault
-    const currentVault = vaults?.find(
-      (v) => v.vaultAddress === selected.vaultAddress
-    );
-    // TODO: Fetch actual user deposit from contract
-    const userDeposit = "0"; // Placeholder - should fetch from contract
+    // Fetch latest balance before opening modal
+    setIsLoadingBalance(true);
+    try {
+      const response = await api.get<{
+        depositAmount: string;
+        currentValue: string;
+        pendingRewards: string;
+        formattedDepositAmount: string;
+        formattedCurrentValue: string;
+        formattedPendingRewards: string;
+      }>(`/api/vault/user-balance?vaultAddress=${selected.vaultAddress}`);
 
-    setWithdrawalDetails({
-      amount: withdrawAmount,
-      symbol: selected.symbol,
-      currentBalance: userDeposit,
-    });
-    setShowWithdrawModal(true);
+      const balance = response.formattedCurrentValue;
+      setUserVaultBalance(balance);
+
+      setWithdrawalDetails({
+        amount: withdrawAmount,
+        symbol: selected.symbol,
+        currentBalance: balance,
+      });
+      setShowWithdrawModal(true);
+    } catch (err: any) {
+      console.error("Failed to fetch user vault balance:", err);
+      // Use current balance if fetch fails
+      setWithdrawalDetails({
+        amount: withdrawAmount,
+        symbol: selected.symbol,
+        currentBalance: userVaultBalance,
+      });
+      setShowWithdrawModal(true);
+    } finally {
+      setIsLoadingBalance(false);
+    }
   };
 
   const handleConfirmWithdraw = async (): Promise<{
@@ -204,6 +271,10 @@ export function TokenVaultSelector() {
       if (result.success && result.txHash) {
         // Refresh vault data after successful withdrawal
         refresh();
+        // Refresh user balance
+        if (selected?.vaultAddress) {
+          await fetchUserVaultBalance(selected.vaultAddress);
+        }
         // Clear withdraw amount and any errors
         setWithdrawAmount("");
         setWithdrawError(null);
@@ -431,8 +502,14 @@ export function TokenVaultSelector() {
                 min={0}
               />
               <p className="text-xs font-mono text-foreground/40">
-                Your balance: 0 {selected.symbol}{" "}
-                {/* TODO: Fetch from contract */}
+                Your balance:{" "}
+                {isLoadingBalance ? (
+                  "Loading..."
+                ) : (
+                  <>
+                    {parseFloat(userVaultBalance).toFixed(6)} {selected.symbol}
+                  </>
+                )}
               </p>
               <button
                 onClick={handleWithdrawClick}

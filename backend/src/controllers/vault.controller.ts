@@ -491,6 +491,92 @@ export const signWithdraw = async (
   }
 };
 
+/**
+ * Get user's balance in a vault
+ * GET /api/vault/user-balance
+ * @note All vault tokens use 18 decimals
+ */
+export const getUserBalance = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+      return;
+    }
+
+    const { vaultAddress } = req.query;
+
+    // Validate input
+    if (!vaultAddress) {
+      res.status(400).json({
+        success: false,
+        message: "vaultAddress is required",
+      });
+      return;
+    }
+
+    // Get user's wallet
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      res.status(404).json({
+        success: false,
+        message: "Wallet not found",
+      });
+      return;
+    }
+
+    // Get actual EVM address from Hedera mirror node
+    const evmAddress = await getEvmAddressFromAccountId(wallet.accountId);
+
+    // Connect to Hedera
+    const provider = new ethers.JsonRpcProvider(HEDERA_TESTNET_RPC);
+
+    // Vault contract ABI for getUserInfo
+    const vaultABI = [
+      "function getUserInfo(address userAddress) external view returns (uint256 depositAmount, uint256 shares, uint256 pendingRewards, uint256 totalClaimed, uint256 depositTime, uint256 currentValue)",
+      "function getUserTotalValue(address userAddress) external view returns (uint256)",
+    ];
+
+    // Create vault contract instance
+    const vaultContract = new ethers.Contract(
+      vaultAddress as string,
+      vaultABI,
+      provider
+    );
+
+    // Get user info from vault
+    const userInfo = await vaultContract.getUserInfo(evmAddress);
+    const depositAmount = userInfo.depositAmount;
+    const currentValue = userInfo.currentValue; // depositAmount + pending rewards
+    const pendingRewards = userInfo.pendingRewards;
+
+    res.status(200).json({
+      success: true,
+      data: {
+        depositAmount: depositAmount.toString(),
+        currentValue: currentValue.toString(),
+        pendingRewards: pendingRewards.toString(),
+        // Format with 18 decimals (standard ERC20 token decimals)
+        formattedDepositAmount: ethers.formatUnits(depositAmount, 18),
+        formattedCurrentValue: ethers.formatUnits(currentValue, 18),
+        formattedPendingRewards: ethers.formatUnits(pendingRewards, 18),
+      },
+    });
+  } catch (error: any) {
+    console.error("Error getting user vault balance:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to get user vault balance",
+    });
+  }
+};
+
 export const getAllowance = async (
   req: Request,
   res: Response
@@ -551,6 +637,7 @@ export const getAllowance = async (
       success: true,
       data: {
         allowance: allowance.toString(),
+        // Format with 18 decimals (standard ERC20 token decimals)
         formattedAllowance: ethers.formatUnits(allowance, 18),
       },
     });
