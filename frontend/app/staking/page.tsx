@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState, useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Logo } from "@/components/logo";
 import {
   XAxis,
@@ -26,14 +27,24 @@ import { AlertCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function StakingPage() {
-  const { getProfile } = useAuth();
+  const { getProfile, isAuthenticated } = useAuth();
+  const router = useRouter();
   const [userEvmAddress, setUserEvmAddress] = useState<string | undefined>();
   const { positions, summary, isLoading, error, refresh } =
     useUserStakingPositions(userEvmAddress);
 
   useEffect(() => {
-    loadUserAddress();
-  }, []);
+    // Check authentication first
+    if (isAuthenticated === false) {
+      router.push("/signin");
+      return;
+    }
+
+    // Only load address if authenticated
+    if (isAuthenticated === true) {
+      loadUserAddress();
+    }
+  }, [isAuthenticated]);
 
   const loadUserAddress = async () => {
     try {
@@ -47,6 +58,7 @@ export default function StakingPage() {
       }
     } catch (err) {
       console.error("Failed to load user EVM address:", err);
+      router.push("/signin");
     }
   };
 
@@ -145,6 +157,15 @@ export default function StakingPage() {
       },
     ];
   }, [positions, summary]);
+
+  // Show loading state while checking authentication
+  if (isAuthenticated === null) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="font-mono text-foreground/60">Loading...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
