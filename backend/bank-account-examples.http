@@ -1,0 +1,177 @@
+### Bank Account API Test Examples
+### Use this file with REST Client or similar HTTP testing tools
+
+### Variables
+@baseUrl = http://localhost:3000/api
+@token = YOUR_AUTH_TOKEN_HERE
+
+### ============================================
+### 1. Register a new user
+### ============================================
+POST {{baseUrl}}/auth/register
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "email": "john.doe@example.com",
+  "password": "password123"
+}
+
+### ============================================
+### 2. Login
+### ============================================
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "password": "password123"
+}
+
+### ============================================
+### 3. Get Available Banks
+### ============================================
+GET {{baseUrl}}/bank-account/banks
+Authorization: Bearer {{token}}
+
+### ============================================
+### 4. Create Bank Account (Test Bank - for testing)
+### ============================================
+POST {{baseUrl}}/bank-account/create
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "bvn": "12345678901",
+  "firstName": "John",
+  "lastName": "Doe",
+  "phone": "08012345678",
+  "preferredBank": "test-bank"
+}
+
+### ============================================
+### 5. Create Bank Account (Wema Bank - Production only)
+### ============================================
+### NOTE: This requires Paystack approval and production keys
+POST {{baseUrl}}/bank-account/create
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "bvn": "22345678901",
+  "firstName": "Jane",
+  "lastName": "Smith",
+  "phone": "09087654321",
+  "preferredBank": "wema-bank"
+}
+
+### ============================================
+### 6. Get Bank Account Details
+### ============================================
+GET {{baseUrl}}/bank-account/details
+Authorization: Bearer {{token}}
+
+### ============================================
+### 7. Get Account Balance
+### ============================================
+GET {{baseUrl}}/bank-account/balance
+Authorization: Bearer {{token}}
+
+### ============================================
+### 8. Get Transaction History (Default - 50 per page)
+### ============================================
+GET {{baseUrl}}/webhook/transactions
+Authorization: Bearer {{token}}
+
+### ============================================
+### 9. Get Transaction History (Paginated - 10 per page)
+### ============================================
+GET {{baseUrl}}/webhook/transactions?limit=10&page=1
+Authorization: Bearer {{token}}
+
+### ============================================
+### 10. Get Transaction History (Page 2)
+### ============================================
+GET {{baseUrl}}/webhook/transactions?limit=10&page=2
+Authorization: Bearer {{token}}
+
+### ============================================
+### 11. Test Webhook (Simulated Paystack Event - charge.success)
+### NOTE: This won't work without proper Paystack signature
+### Use Paystack's webhook testing tools instead
+### ============================================
+POST {{baseUrl}}/webhook/paystack
+Content-Type: application/json
+X-Paystack-Signature: test_signature
+
+{
+  "event": "charge.success",
+  "data": {
+    "reference": "txn_test_12345",
+    "amount": 5000000,
+    "currency": "NGN",
+    "customer": {
+      "email": "john.doe@example.com",
+      "customer_code": "CUS_xxx"
+    },
+    "channel": "dedicated_nuban",
+    "paid_at": "2024-01-15T10:30:00.000Z",
+    "metadata": {
+      "account_number": "9876543210"
+    }
+  }
+}
+
+### ============================================
+### Error Cases - Testing validation
+### ============================================
+
+### Missing BVN
+POST {{baseUrl}}/bank-account/create
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "firstName": "John",
+  "lastName": "Doe",
+  "phone": "08012345678"
+}
+
+### Invalid BVN (less than 11 digits)
+POST {{baseUrl}}/bank-account/create
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "bvn": "12345",
+  "firstName": "John",
+  "lastName": "Doe",
+  "phone": "08012345678"
+}
+
+### Invalid Phone Number Format
+POST {{baseUrl}}/bank-account/create
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "bvn": "12345678901",
+  "firstName": "John",
+  "lastName": "Doe",
+  "phone": "1234567890"
+}
+
+### Try Creating Duplicate Account
+### (Should fail if account already exists)
+POST {{baseUrl}}/bank-account/create
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "bvn": "12345678901",
+  "firstName": "John",
+  "lastName": "Doe",
+  "phone": "08012345678"
+}
+

@@ -25,13 +25,13 @@ const generateToken = (userId: string): string => {
  */
 export const register = async (req: Request, res: Response): Promise<void> => {
   try {
-    const { fullName, email, password } = req.body;
+    const { firstName, lastName, email, password } = req.body;
 
     // Validate input
-    if (!fullName || !email || !password) {
+    if (!firstName || !lastName || !email || !password) {
       res.status(400).json({
         success: false,
-        message: "Please provide full name, email, and password",
+        message: "Please provide first name, last name, email, and password",
       });
       return;
     }
@@ -48,7 +48,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
 
     // Create user
     const user = await User.create({
-      fullName,
+      firstName,
+      lastName,
       email: email.toLowerCase(),
       password,
     });
@@ -94,7 +95,8 @@ export const register = async (req: Request, res: Response): Promise<void> => {
         token,
         user: {
           id: user._id,
-          fullName: user.fullName,
+          firstName: user.firstName,
+          lastName: user.lastName,
           email: user.email,
         },
         wallet: {
@@ -193,7 +195,8 @@ export const login = async (req: Request, res: Response): Promise<void> => {
         token,
         user: {
           id: user._id,
-          fullName: user.fullName,
+          firstName: user.firstName,
+          lastName: user.lastName,
           email: user.email,
         },
         wallet: {
@@ -239,7 +242,8 @@ export const getMe = async (req: Request, res: Response): Promise<void> => {
       data: {
         user: {
           id: user._id,
-          fullName: user.fullName,
+          firstName: user.firstName,
+          lastName: user.lastName,
           email: user.email,
         },
         wallet: wallet
@@ -322,6 +326,213 @@ export const fundWallet = async (
     res.status(500).json({
       success: false,
       message: "Error funding wallet",
+      error: (error as Error).message,
+    });
+  }
+};
+
+/**
+ * Send HBAR to user's wallet
+ * POST /api/auth/send-hbar
+ */
+export const sendHBAR = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).user.id;
+    const { amount } = req.body;
+
+    // Validate input
+    if (!amount) {
+      res.status(400).json({
+        success: false,
+        message: "Please provide amount",
+      });
+      return;
+    }
+
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      res.status(404).json({
+        success: false,
+        message: "Wallet not found",
+      });
+      return;
+    }
+
+    // Send HBAR to the wallet
+    const sendResult = await blockchainService.sendHBAR(
+      wallet.accountId,
+      amount
+    );
+
+    if (sendResult.success) {
+      // Update wallet balance
+      const newBalance = await blockchainService.getHBARBalance(
+        wallet.accountId
+      );
+      wallet.balance = parseFloat(newBalance);
+
+      // Activate wallet if not activated and has sufficient balance
+      if (
+        !wallet.isActivated &&
+        wallet.balance >= parseFloat(env.ACTIVATION_AMOUNT)
+      ) {
+        wallet.isActivated = true;
+      }
+
+      await wallet.save();
+
+      res.status(200).json({
+        success: true,
+        message: `Successfully sent ${amount} HBAR to your wallet`,
+        data: {
+          txId: sendResult.txId,
+          wallet: {
+            accountId: wallet.accountId,
+            evmAddress: wallet.evmAddress,
+            balance: wallet.balance,
+            isActivated: wallet.isActivated,
+          },
+        },
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        message: sendResult.message,
+      });
+    }
+  } catch (error) {
+    console.error("Send HBAR error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error sending HBAR",
+      error: (error as Error).message,
+    });
+  }
+};
+
+/**
+ * Transfer HBAR to another account
+ * POST /api/auth/transfer-hbar
+ */
+export const transferHBAR = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user.id;
+    const { toAccountId, amount } = req.body;
+
+    // Validate input
+    if (!toAccountId || !amount) {
+      res.status(400).json({
+        success: false,
+        message: "Please provide recipient account ID and amount",
+      });
+      return;
+    }
+
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      res.status(404).json({
+        success: false,
+        message: "Wallet not found",
+      });
+      return;
+    }
+
+    // Decrypt private key
+    const { walletGeneratorService } = await import(
+      "../services/walletGenerator.service"
+    );
+    const privateKey = walletGeneratorService.decryptPrivateKey(
+      wallet.encryptedPrivateKey,
+      wallet.iv,
+      wallet.authTag
+    );
+
+    // Transfer HBAR
+    const transferResult = await blockchainService.transferHBAR(
+      wallet.accountId,
+      privateKey,
+      toAccountId,
+      amount
+    );
+
+    if (transferResult.success) {
+      // Update wallet balance
+      wallet.balance = parseFloat(transferResult.balance || "0");
+      await wallet.save();
+
+      res.status(200).json({
+        success: true,
+        message: `Successfully transferred ${amount} HBAR to ${toAccountId}`,
+        data: {
+          txId: transferResult.txId,
+          from: wallet.accountId,
+          to: toAccountId,
+          amount: amount,
+          newBalance: wallet.balance,
+        },
+      });
+    } else {
+      res.status(400).json({
+        success: false,
+        message: transferResult.message,
+        balance: transferResult.balance,
+      });
+    }
+  } catch (error) {
+    console.error("Transfer HBAR error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error transferring HBAR",
+      error: (error as Error).message,
+    });
+  }
+};
+
+/**
+ * Get wallet balance
+ * GET /api/auth/wallet-balance
+ */
+export const getWalletBalance = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user.id;
+
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      res.status(404).json({
+        success: false,
+        message: "Wallet not found",
+      });
+      return;
+    }
+
+    // Get live balance from Hedera
+    const balance = await blockchainService.getHBARBalance(wallet.accountId);
+
+    // Update stored balance
+    wallet.balance = parseFloat(balance);
+    await wallet.save();
+
+    res.status(200).json({
+      success: true,
+      data: {
+        accountId: wallet.accountId,
+        evmAddress: wallet.evmAddress,
+        balance: wallet.balance,
+        balanceString: balance,
+        isActivated: wallet.isActivated,
+      },
+    });
+  } catch (error) {
+    console.error("Get wallet balance error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching wallet balance",
       error: (error as Error).message,
     });
   }

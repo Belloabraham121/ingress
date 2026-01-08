@@ -32,4 +32,3 @@ console.log("MASTER_SEED=" + masterSeed);
 console.log("ENCRYPTION_SECRET_KEY=" + encryptionKey);
 console.log("JWT_SECRET=" + jwtSecret);
 console.log("\n" + "=".repeat(60) + "\n");
-

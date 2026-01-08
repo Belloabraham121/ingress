@@ -1,0 +1,257 @@
+"use client";
+
+import { useState, useMemo, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { TokenVaultCard } from "@/components/token-vault-card";
+import { InvestConfirmationModal } from "@/components/invest-confirmation-modal";
+import { useVaults } from "@/hooks/useVaults";
+import { Skeleton } from "@/components/ui/skeleton";
+import { AlertCircle, RefreshCw } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+
+interface TokenVault {
+  id: string;
+  name: string;
+  symbol: string;
+  apy: number;
+  tvl: string;
+  minDeposit: number;
+  status: "active" | "paused";
+  realTimeApy?: number;
+  vaultAddress?: string;
+  depositorCount?: number;
+  daysRemaining?: number;
+}
+
+export function TokenVaultSelector() {
+  const { vaults, isLoading, error, refresh } = useVaults();
+  const [selectedVault, setSelectedVault] = useState<string>("");
+  const [depositAmount, setDepositAmount] = useState("");
+  const [showConfirmation, setShowConfirmation] = useState(false);
+
+  // Convert blockchain vaults to TokenVault format
+  const tokenVaults: TokenVault[] = useMemo(() => {
+    if (!vaults || vaults.length === 0) return [];
+
+    return vaults
+      .filter((v) => v.active) // Only show active vaults
+      .map((vault) => ({
+        id: vault.vaultAddress,
+        name: vault.name,
+        symbol: vault.symbol,
+        apy: vault.apr,
+        tvl: vault.tvl,
+        minDeposit: 100, // Default min deposit (could be fetched from vault details)
+        status: vault.active ? ("active" as const) : ("paused" as const),
+        realTimeApy: vault.apr, // Real-time APY from blockchain
+        vaultAddress: vault.vaultAddress,
+        depositorCount: vault.depositorCount,
+        daysRemaining: vault.daysRemaining,
+      }));
+  }, [vaults]);
+
+  // Auto-select first vault when loaded
+  useEffect(() => {
+    if (tokenVaults.length > 0 && !selectedVault) {
+      setSelectedVault(tokenVaults[0].id);
+    }
+  }, [tokenVaults, selectedVault]);
+
+  const selected = tokenVaults.find((vault) => vault.id === selectedVault);
+  const projectedReturn = selected
+    ? (Number.parseFloat(depositAmount || "0") * (selected.apy / 100)).toFixed(
+        2
+      )
+    : "0.00";
+
+  const handleDepositClick = () => {
+    if (
+      depositAmount &&
+      Number.parseFloat(depositAmount) >= (selected?.minDeposit || 0)
+    ) {
+      setShowConfirmation(true);
+    }
+  };
+
+  const handleConfirmDeposit = () => {
+    setShowConfirmation(false);
+    setDepositAmount("");
+  };
+
+  return (
+    <>
+      <div className="border border-border bg-background p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-start justify-between">
+          <div>
+            <h3 className="text-lg font-sentient mb-2">TOKEN VAULT SYSTEM</h3>
+            <p className="text-xs font-mono text-foreground/60">
+              Deposit your tokens into secure vaults and earn real-time APY
+              rewards
+            </p>
+          </div>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={refresh}
+            disabled={isLoading}
+            className="ml-2"
+          >
+            <RefreshCw
+              className={`h-4 w-4 ${isLoading ? "animate-spin" : ""}`}
+            />
+          </Button>
+        </div>
+
+        {/* Error State */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Loading State */}
+        {isLoading && tokenVaults.length === 0 ? (
+          <div className="space-y-6">
+            <div>
+              <label className="block text-sm font-mono text-foreground/60 mb-3">
+                SELECT TOKEN VAULT
+              </label>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[1, 2, 3, 4].map((i) => (
+                  <div key={i} className="border border-border p-4 space-y-2">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-3 w-1/2" />
+                    <Skeleton className="h-3 w-full" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : tokenVaults.length === 0 ? (
+          /* Empty State */
+          <div className="border border-border/50 p-8 text-center space-y-2">
+            <p className="text-sm font-mono text-foreground/60">
+              No active vaults found
+            </p>
+            <p className="text-xs font-mono text-foreground/40">
+              Please deploy vaults first or check network connection
+            </p>
+          </div>
+        ) : (
+          /* Vault Selection */
+          <div>
+            <label className="block text-sm font-mono text-foreground/60 mb-3">
+              SELECT TOKEN VAULT ({tokenVaults.length} available)
+            </label>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {tokenVaults.map((vault) => (
+                <TokenVaultCard
+                  key={vault.id}
+                  vault={vault}
+                  isSelected={selectedVault === vault.id}
+                  onSelect={setSelectedVault}
+                />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Deposit Amount */}
+        {selected && (
+          <>
+            <div>
+              <label className="block text-sm font-mono text-foreground/60 mb-3">
+                DEPOSIT AMOUNT ({selected?.symbol})
+              </label>
+              <Input
+                type="number"
+                placeholder="0.00"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(e.target.value)}
+                className="bg-background border-border text-foreground placeholder:text-foreground/30"
+                min={selected.minDeposit}
+              />
+              <p className="text-xs font-mono text-foreground/40 mt-1">
+                Minimum deposit: {selected.minDeposit} {selected.symbol}
+              </p>
+            </div>
+
+            {/* Deposit Summary */}
+            <div className="border border-border/50 p-4 space-y-2">
+              <div className="flex justify-between text-sm font-mono">
+                <span className="text-foreground/60">Vault TVL:</span>
+                <span className="text-foreground">{selected.tvl}</span>
+              </div>
+              <div className="flex justify-between text-sm font-mono">
+                <span className="text-foreground/60">Real-time APY:</span>
+                <span className="text-primary font-bold">
+                  {selected.realTimeApy?.toFixed(2)}%
+                </span>
+              </div>
+              <div className="flex justify-between text-sm font-mono">
+                <span className="text-foreground/60">
+                  Projected Annual Return:
+                </span>
+                <span className="text-primary">
+                  {projectedReturn} {selected.symbol}
+                </span>
+              </div>
+              {selected.depositorCount !== undefined && (
+                <div className="flex justify-between text-sm font-mono">
+                  <span className="text-foreground/60">Total Depositors:</span>
+                  <span className="text-foreground">
+                    {selected.depositorCount}
+                  </span>
+                </div>
+              )}
+              {selected.daysRemaining !== undefined && (
+                <div className="flex justify-between text-sm font-mono">
+                  <span className="text-foreground/60">Rewards Remaining:</span>
+                  <span className="text-foreground">
+                    {selected.daysRemaining > 365
+                      ? "1+ year"
+                      : `~${selected.daysRemaining} days`}
+                  </span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm font-mono">
+                <span className="text-foreground/60">Lock Period:</span>
+                <span className="text-foreground">Flexible</span>
+              </div>
+            </div>
+
+            <Button
+              onClick={handleDepositClick}
+              disabled={
+                !depositAmount ||
+                Number.parseFloat(depositAmount) <
+                  (selected?.minDeposit || 0) ||
+                isLoading
+              }
+              className="w-full"
+            >
+              {isLoading ? "LOADING..." : "[DEPOSIT TO VAULT]"}
+            </Button>
+          </>
+        )}
+      </div>
+
+      {selected && (
+        <InvestConfirmationModal
+          isOpen={showConfirmation}
+          onClose={() => setShowConfirmation(false)}
+          onConfirm={handleConfirmDeposit}
+          strategy={`${selected.name} (${selected.symbol})`}
+          amount={depositAmount}
+          apy={selected.apy || 0}
+          projectedReturn={projectedReturn}
+          lockPeriod="Flexible"
+          riskLevel="Low"
+        />
+      )}
+    </>
+  );
+}
