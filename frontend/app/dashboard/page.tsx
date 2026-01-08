@@ -16,6 +16,7 @@ import { RecentActivityCard } from "@/components/recent-activity-card";
 import { useAuth } from "@/hooks/useAuth";
 import { getEvmAddressFromAccountId } from "@/lib/hedera-utils";
 import { useUserVaultPositions } from "@/hooks/useUserVaultPositions";
+import { useUserStakingPositions } from "@/hooks/useUserStakingPositions";
 import { useRouter } from "next/navigation";
 
 type TabType = "swap" | "invest" | "stake" | "account" | "profile";
@@ -49,6 +50,14 @@ export default function DashboardPage() {
   };
 
   const { summary, positions } = useUserVaultPositions(evmAddress);
+  const { summary: stakingSummary } = useUserStakingPositions(evmAddress);
+
+  const portfolioValue = (() => {
+    const vaultCurrent = summary ? Number(summary.totalCurrentValue) : 0;
+    const vaultProfit = summary ? Number(summary.totalProjectedReturn) : 0;
+    const stakingTotal = stakingSummary ? Number(stakingSummary.totalValue) : 0;
+    return vaultCurrent + vaultProfit + stakingTotal;
+  })();
 
   const handleLogout = () => {
     logout();
@@ -146,26 +155,33 @@ export default function DashboardPage() {
                 </p>
                 <p className="text-3xl font-sentient text-primary mb-2">
                   $
+                  {portfolioValue.toLocaleString(undefined, {
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+                <p className="text-xs font-mono text-foreground/50">
+                  Vault Value $
                   {summary
                     ? Number(summary.totalCurrentValue).toLocaleString(
                         undefined,
                         { maximumFractionDigits: 2 }
                       )
                     : "0.00"}
+                  {" · "}Vault Profit $
+                  {summary
+                    ? Number(summary.totalProjectedReturn).toLocaleString(
+                        undefined,
+                        { maximumFractionDigits: 2 }
+                      )
+                    : "0.00"}
+                  {" · "}Staked Value $
+                  {stakingSummary
+                    ? Number(stakingSummary.totalValue).toLocaleString(
+                        undefined,
+                        { maximumFractionDigits: 2 }
+                      )
+                    : "0.00"}
                 </p>
-                {summary && (
-                  <p className="text-xs font-mono text-foreground/50">
-                    Deposited $
-                    {Number(summary.totalDeposited).toLocaleString(undefined, {
-                      maximumFractionDigits: 2,
-                    })}{" "}
-                    · Pending Rewards $
-                    {Number(summary.totalPendingRewards).toLocaleString(
-                      undefined,
-                      { maximumFractionDigits: 2 }
-                    )}
-                  </p>
-                )}
               </div>
 
               {/* Active Positions */}
