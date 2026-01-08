@@ -135,6 +135,18 @@ export function useStakingDeposit() {
 
       setTxHash(stakeResponse.transactionHash);
 
+      // Wait for on-chain confirmation then refresh positions
+      try {
+        const provider = new ethers.JsonRpcProvider(
+          "https://testnet.hashio.io/api"
+        );
+        await provider.waitForTransaction(
+          stakeResponse.transactionHash,
+          1,
+          90_000
+        );
+      } catch {}
+
       // Dispatch events to refresh activity list and staking positions
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("activityUpdated"));

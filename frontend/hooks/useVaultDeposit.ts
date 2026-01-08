@@ -131,6 +131,18 @@ export function useVaultDeposit() {
 
       setTxHash(depositResponse.transactionHash);
 
+      // Wait for on-chain confirmation then refresh positions
+      try {
+        const provider = new ethers.JsonRpcProvider(
+          "https://testnet.hashio.io/api"
+        );
+        await provider.waitForTransaction(
+          depositResponse.transactionHash,
+          1,
+          90_000
+        );
+      } catch {}
+
       // Dispatch events to refresh activity list and positions
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("activityUpdated"));

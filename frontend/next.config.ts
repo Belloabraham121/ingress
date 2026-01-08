@@ -11,7 +11,14 @@ const nextConfig: NextConfig = {
   images: {
     unoptimized: true,
   },
-  transpilePackages: ["three", "leva", "r3f-perf", "maath"],
+  transpilePackages: [
+    "three",
+    "leva",
+    "r3f-perf",
+    "maath",
+    "@react-three/fiber",
+    "@react-three/drei",
+  ],
   webpack: (config, { isServer }) => {
     // Critical: Ensure single React instance across all packages
     if (!isServer) {
