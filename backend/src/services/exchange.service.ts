@@ -24,10 +24,10 @@ const USDC_TOKEN = "0x125D3f690f281659Dd7708D21688BC83Ee534aE6";
 const USDT_TOKEN = "0xd4E61131Ed9C3dd610727655aE8254B286deE95c";
 const DAI_TOKEN = "0x3814F5Cf6c4Aa63EdDF8A79c82346a163c7E7C53";
 
-// Token decimals
+// Token decimals (all stables use 18 decimals in our utils/contracts)
 const TOKEN_DECIMALS: Record<string, number> = {
-  [USDC_TOKEN.toLowerCase()]: 6,
-  [USDT_TOKEN.toLowerCase()]: 6,
+  [USDC_TOKEN.toLowerCase()]: 18,
+  [USDT_TOKEN.toLowerCase()]: 18,
   [DAI_TOKEN.toLowerCase()]: 18,
   hbar: 8,
 };
@@ -472,7 +472,7 @@ class ExchangeService {
     tokenAddress: string,
     nairaAmount: number,
     paystackReference: string
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; txId?: string }> {
     try {
       console.log("\n🔄 Processing Naira → Token swap...");
       console.log(`   User: ${userAddress}`);
@@ -489,7 +489,7 @@ class ExchangeService {
 
       if (!rate) {
         console.error(`❌ No exchange rate found for token: ${tokenAddress}`);
-        return false;
+        return { success: false };
       }
 
       // Calculate token amount
@@ -509,6 +509,43 @@ class ExchangeService {
       const accountId = AccountId.fromString(this.adminAccountId);
       const privateKey = PrivateKey.fromStringECDSA(this.adminPrivateKey);
       client.setOperator(accountId, privateKey);
+
+      // Diagnostics: authorized withdrawer and liquidity
+      try {
+        const rpc = new ethers.JsonRpcProvider("https://testnet.hashio.io/api");
+        const exchangeAbi = [
+          "function authorizedWithdrawer() view returns (address)",
+        ];
+        const erc20Abi = [
+          "function balanceOf(address) view returns (uint256)",
+          "function decimals() view returns (uint8)",
+          "function symbol() view returns (string)",
+        ];
+
+        const exchangeRead = new ethers.Contract(
+          EXCHANGE_CONTRACT,
+          exchangeAbi,
+          rpc
+        );
+        const auth = await exchangeRead.authorizedWithdrawer();
+        console.log(`   Exchange.authorizedWithdrawer: ${auth}`);
+
+        const tokenRead = new ethers.Contract(tokenAddress, erc20Abi, rpc);
+        const exBalance = await tokenRead.balanceOf(EXCHANGE_CONTRACT);
+        const tokenSym = await tokenRead.symbol().catch(() => tokenSymbol);
+        const tokenDec = await tokenRead.decimals().catch(() => decimals);
+        const exBalHuman = parseFloat(ethers.formatUnits(exBalance, tokenDec));
+        console.log(
+          `   Exchange ${tokenSym} balance: ${exBalHuman} (needs ≥ ${tokenAmount.toFixed(
+            decimals
+          )})`
+        );
+      } catch (diagErr) {
+        console.warn(
+          "   (diag) Failed to fetch exchange diagnostics:",
+          diagErr
+        );
+      }
 
       // Encode transferToUser function call
       const transferInterface = new ethers.Interface([
@@ -532,8 +569,14 @@ class ExchangeService {
       const txResponse = await transaction.execute(client);
       const receipt = await txResponse.getReceipt(client);
 
-      console.log("✅ Token transfer successful!");
+      const statusStr = receipt.status.toString();
       console.log(`   Tx: ${txResponse.transactionId.toString()}`);
+      console.log(`   Status: ${statusStr}`);
+      if (statusStr !== "SUCCESS") {
+        console.error("❌ Token transfer failed at receipt stage");
+        client.close();
+        return { success: false };
+      }
 
       client.close();
 
@@ -554,10 +597,33 @@ class ExchangeService {
         },
       });
 
-      return true;
+      // Decrease user's NGN balance since funds were used to buy tokens
+      try {
+        const bankAccount = await BankAccount.findOne({ userId });
+        if (bankAccount) {
+          const oldBalance = bankAccount.balance || 0;
+          const newBalance = Math.max(0, oldBalance - nairaAmount);
+          bankAccount.balance = newBalance;
+          await bankAccount.save();
+          console.log(
+            `✅ NGN balance debited: ₦${oldBalance} → ₦${newBalance}`
+          );
+        } else {
+          console.warn(
+            "⚠️ Bank account not found when debiting NGN for naira_to_token"
+          );
+        }
+      } catch (debitErr) {
+        console.error(
+          "❌ Failed to debit NGN balance for naira_to_token:",
+          debitErr
+        );
+      }
+
+      return { success: true, txId: txResponse.transactionId.toString() };
     } catch (error) {
       console.error("❌ Error handling Naira → Token swap:", error);
-      return false;
+      return { success: false };
     }
   }
 
@@ -569,7 +635,7 @@ class ExchangeService {
     userId: string,
     nairaAmount: number,
     paystackReference: string
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; txId?: string }> {
     try {
       console.log("\n🔄 Processing Naira → HBAR swap...");
       console.log(`   User: ${userAddress}`);
@@ -590,6 +656,30 @@ class ExchangeService {
       const accountId = AccountId.fromString(this.adminAccountId);
       const privateKey = PrivateKey.fromStringECDSA(this.adminPrivateKey);
       client.setOperator(accountId, privateKey);
+
+      // Diagnostics: authorized withdrawer and HBAR liquidity
+      try {
+        const rpc = new ethers.JsonRpcProvider("https://testnet.hashio.io/api");
+        const exchangeAbi = [
+          "function authorizedWithdrawer() view returns (address)",
+        ];
+        const exchangeRead = new ethers.Contract(
+          EXCHANGE_CONTRACT,
+          exchangeAbi,
+          rpc
+        );
+        const auth = await exchangeRead.authorizedWithdrawer();
+        const hbarBal = await rpc.getBalance(EXCHANGE_CONTRACT);
+        console.log(`   Exchange.authorizedWithdrawer: ${auth}`);
+        console.log(
+          `   Exchange HBAR balance: ${ethers.formatUnits(
+            hbarBal,
+            8
+          )} (needs ≥ ${hbarAmount.toFixed(8)})`
+        );
+      } catch (diagErr) {
+        console.warn("   (diag) Failed to fetch HBAR diagnostics:", diagErr);
+      }
 
       // Encode transferHbarToUser function call
       const transferInterface = new ethers.Interface([
@@ -613,8 +703,14 @@ class ExchangeService {
       const txResponse = await transaction.execute(client);
       const receipt = await txResponse.getReceipt(client);
 
-      console.log("✅ HBAR transfer successful!");
+      const statusStr = receipt.status.toString();
       console.log(`   Tx: ${txResponse.transactionId.toString()}`);
+      console.log(`   Status: ${statusStr}`);
+      if (statusStr !== "SUCCESS") {
+        console.error("❌ HBAR transfer failed at receipt stage");
+        client.close();
+        return { success: false };
+      }
 
       client.close();
 
@@ -635,10 +731,33 @@ class ExchangeService {
         },
       });
 
-      return true;
+      // Decrease user's NGN balance since funds were used to buy HBAR
+      try {
+        const bankAccount = await BankAccount.findOne({ userId });
+        if (bankAccount) {
+          const oldBalance = bankAccount.balance || 0;
+          const newBalance = Math.max(0, oldBalance - nairaAmount);
+          bankAccount.balance = newBalance;
+          await bankAccount.save();
+          console.log(
+            `✅ NGN balance debited: ₦${oldBalance} → ₦${newBalance}`
+          );
+        } else {
+          console.warn(
+            "⚠️ Bank account not found when debiting NGN for naira_to_hbar"
+          );
+        }
+      } catch (debitErr) {
+        console.error(
+          "❌ Failed to debit NGN balance for naira_to_hbar:",
+          debitErr
+        );
+      }
+
+      return { success: true, txId: txResponse.transactionId.toString() };
     } catch (error) {
       console.error("❌ Error handling Naira → HBAR swap:", error);
-      return false;
+      return { success: false };
     }
   }
 

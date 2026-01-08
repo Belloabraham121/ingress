@@ -9,6 +9,7 @@ import {
   initiateNairaToTokenPayment,
   swapTokenToToken,
   cashoutTokenToNaira,
+  spendNairaForExchange,
 } from "../controllers/exchange.controller";
 import { protect as authenticate } from "../middleware/auth.middleware";
 
@@ -77,5 +78,12 @@ router.post("/swap-token-token", authenticate, swapTokenToToken);
  * @access  Private
  */
 router.post("/cashout-token", authenticate, cashoutTokenToNaira);
+
+/**
+ * @route   POST /api/exchange/spend-naira
+ * @desc    Spend NGN balance to buy Token/HBAR (no Paystack)
+ * @access  Private
+ */
+router.post("/spend-naira", authenticate, spendNairaForExchange);
 
 export default router;

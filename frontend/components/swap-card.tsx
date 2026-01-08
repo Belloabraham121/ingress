@@ -31,9 +31,15 @@ const AVAILABLE_TOKENS: TokenOption[] = [
 
 // Helper to get token decimals
 const getTokenDecimals = (symbol: string): number => {
-  if (symbol === "USDC" || symbol === "USDT") return 18;
   if (symbol === "HBAR") return 8; // display purposes; on-chain is 8
-  return 18;
+  return 18; // All stables and others use 18 in our utils/contracts
+};
+
+// Display precision (UI) independent of on-chain decimals
+const getDisplayDecimals = (symbol: string): number => {
+  if (symbol === "USDC" || symbol === "USDT" || symbol === "DAI") return 1; // e.g., 6.9
+  if (symbol === "HBAR") return 4;
+  return 4;
 };
 
 // Helper to trim trailing zeros from a decimal string
@@ -85,8 +91,8 @@ export function SwapCard() {
         parseFloat(fromAmount)
       );
       if (result) {
-        const toDec = getTokenDecimals(toToken.symbol);
-        const formatted = trimTrailingZeros(result.output.toFixed(toDec));
+        const displayDec = getDisplayDecimals(toToken.symbol);
+        const formatted = trimTrailingZeros(result.output.toFixed(displayDec));
         setToAmount(formatted);
       }
     } catch (error) {
@@ -123,10 +129,7 @@ export function SwapCard() {
       // Case 1: Token → Naira (Cash out)
       if (toToken.symbol === "NGN" && fromToken.address) {
         // Calculate token amount with decimals
-        let decimals = 18;
-        if (fromToken.symbol === "USDC" || fromToken.symbol === "USDT") {
-          decimals = 6;
-        }
+        const decimals = getTokenDecimals(fromToken.symbol);
         const amountInSmallestUnit = (
           amount * Math.pow(10, decimals)
         ).toString();
@@ -136,45 +139,94 @@ export function SwapCard() {
           amountInSmallestUnit
         );
         if (result) {
+          // Immediately trigger backend cashout to Paystack
+          const token = getToken();
+          const API_URL =
+            process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
+          try {
+            const resp = await fetch(`${API_URL}/exchange/cashout-token`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                tokenAddress: fromToken.address,
+                amountSmallest: amountInSmallestUnit,
+                tokenDecimals: decimals,
+              }),
+            });
+            const data = await resp.json();
+            if (!data.success) {
+              alert(data.message || "❌ Cashout failed on server.");
+              return { success: false };
+            }
+          } catch (e) {
+            console.error("Cashout error:", e);
+            alert("❌ Cashout error. Please try again later.");
+            return { success: false };
+          }
+
           resetForm();
           return {
             success: true,
-            transactionHash:
-              "Deposit initiated - Check your bank account in a few minutes",
+            transactionHash: "Cashout initiated - funds will arrive shortly",
           };
         } else {
           alert("❌ Swap failed. Please try again.");
           return { success: false };
         }
       }
-      // Case 2: Naira → Token (Buy crypto)
+      // Case 2: Naira → Token (Buy crypto using existing NGN balance)
       else if (fromToken.symbol === "NGN" && toToken.address) {
-        const paymentUrl = await initiateNairaToToken(toToken.address, amount);
-        if (paymentUrl) {
-          // Redirect to PayStack payment (will show success after payment)
-          window.location.href = paymentUrl;
-          return {
-            success: true,
-            transactionHash: "Redirecting to PayStack...",
-          };
-        } else {
-          alert("❌ Failed to initiate payment. Please try again.");
+        const token = getToken();
+        const resp = await fetch(`${API_URL}/exchange/spend-naira`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            exchangeType: "naira_to_token",
+            nairaAmount: amount,
+            tokenAddress: toToken.address,
+          }),
+        });
+        const data = await resp.json();
+        if (!data.success) {
+          alert(data.message || "❌ Swap failed.");
           return { success: false };
         }
+        resetForm();
+        return {
+          success: true,
+          transactionHash: data.data?.transactionHash,
+        };
       }
-      // Case 3: Naira → HBAR
+      // Case 3: Naira → HBAR (using existing NGN balance)
       else if (fromToken.symbol === "NGN" && toToken.symbol === "HBAR") {
-        const paymentUrl = await initiateNairaToHbar(amount);
-        if (paymentUrl) {
-          window.location.href = paymentUrl;
-          return {
-            success: true,
-            transactionHash: "Redirecting to PayStack...",
-          };
-        } else {
-          alert("❌ Failed to initiate payment. Please try again.");
+        const token = getToken();
+        const resp = await fetch(`${API_URL}/exchange/spend-naira`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            exchangeType: "naira_to_hbar",
+            nairaAmount: amount,
+          }),
+        });
+        const data = await resp.json();
+        if (!data.success) {
+          alert(data.message || "❌ Swap failed.");
           return { success: false };
         }
+        resetForm();
+        return {
+          success: true,
+          transactionHash: data.data?.transactionHash,
+        };
       }
       // Case 4: HBAR → Naira
       else if (fromToken.symbol === "HBAR" && toToken.symbol === "NGN") {

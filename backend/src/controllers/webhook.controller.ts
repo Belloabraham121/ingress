@@ -216,7 +216,7 @@ async function handleChargeSuccess(data: any): Promise<void> {
 
       if (exchangeType === "naira_to_token" && tokenAddress) {
         // Naira → Token
-        const success = await exchangeService.handleNairaToToken(
+        const result = await exchangeService.handleNairaToToken(
           walletAddress,
           bankAccount.userId.toString(),
           tokenAddress,
@@ -224,21 +224,21 @@ async function handleChargeSuccess(data: any): Promise<void> {
           reference
         );
 
-        if (success) {
+        if (result.success) {
           console.log("✅ Token sent to user successfully!");
         } else {
           console.error("❌ Failed to send token to user");
         }
       } else if (exchangeType === "naira_to_hbar") {
         // Naira → HBAR
-        const success = await exchangeService.handleNairaToHbar(
+        const result = await exchangeService.handleNairaToHbar(
           walletAddress,
           bankAccount.userId.toString(),
           nairaAmount,
           reference
         );
 
-        if (success) {
+        if (result.success) {
           console.log("✅ HBAR sent to user successfully!");
         } else {
           console.error("❌ Failed to send HBAR to user");
