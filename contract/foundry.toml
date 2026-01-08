@@ -9,4 +9,17 @@ via_ir = true
 optimizer = true
 optimizer_runs = 200
 
+[rpc_endpoints]
+# Hedera Testnet
+hedera_testnet = "https://testnet.hashio.io/api"
+testnet = "${RPC_URL}"
+
+# Hedera Mainnet
+hedera_mainnet = "https://mainnet.hashio.io/api"
+mainnet = "https://mainnet.hashio.io/api"
+
+[etherscan]
+# Hedera doesn't use Etherscan, but we can configure for other networks if needed
+# hedera_testnet = { key = "${HEDERA_API_KEY}", url = "https://hashscan.io/testnet" }
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

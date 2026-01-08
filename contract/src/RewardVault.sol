@@ -154,6 +154,21 @@ contract RewardVault is ERC20, ReentrancyGuard, Pausable {
         maxDepositPerUser = _maxDepositPerUser;
     }
 
+    // ============ Factory Functions ============
+
+    /**
+     * @notice Initialize rewards pool during vault creation (factory only)
+     * @param amount Amount of tokens already transferred to this contract
+     */
+    function initializeRewardsPool(uint256 amount) external {
+        require(msg.sender == factory, "Only factory");
+        require(rewardsPool == 0, "Already initialized");
+        require(amount > 0, "Zero amount");
+
+        rewardsPool = amount;
+        emit RewardsPoolIncreased(amount, rewardsPool, block.timestamp);
+    }
+
     // ============ Owner Functions ============
 
     /**
