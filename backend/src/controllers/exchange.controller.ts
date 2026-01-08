@@ -6,6 +6,8 @@ import {
   AccountId,
   ContractExecuteTransaction,
   ContractId,
+  Hbar,
+  HbarUnit,
 } from "@hashgraph/sdk";
 import { Wallet } from "../models/Wallet";
 import { walletGeneratorService } from "../services/walletGenerator.service";
@@ -254,6 +256,90 @@ export const signDepositToken = async (
     res.status(500).json({
       success: false,
       message: error.message || "Failed to sign deposit transaction",
+    });
+  }
+};
+
+/**
+ * Deposit HBAR to exchange (payable)
+ * POST /api/exchange/deposit-hbar
+ * Body: { exchangeAddress, amountHbar }
+ */
+export const depositHbar = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, message: "Unauthorized" });
+      return;
+    }
+
+    const { exchangeAddress, amountHbar } = req.body as {
+      exchangeAddress: string;
+      amountHbar: string; // human HBAR (e.g., "10")
+    };
+
+    if (!exchangeAddress || !amountHbar) {
+      res.status(400).json({
+        success: false,
+        message: "exchangeAddress and amountHbar are required",
+      });
+      return;
+    }
+
+    // Get user's wallet
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      res.status(404).json({ success: false, message: "Wallet not found" });
+      return;
+    }
+
+    // Decrypt private key
+    const privateKeyHex = walletGeneratorService.decryptPrivateKey(
+      wallet.encryptedPrivateKey,
+      wallet.iv,
+      wallet.authTag
+    );
+
+    // Initialize Hedera client with user's account
+    const client = Client.forTestnet();
+    const accountId = AccountId.fromString(wallet.accountId);
+    const privateKey = PrivateKey.fromStringECDSA(privateKeyHex);
+    client.setOperator(accountId, privateKey);
+
+    // depositHbar() payable
+    const depositInterface = new ethers.Interface([
+      "function depositHbar() payable",
+    ]);
+    const depositData = depositInterface.encodeFunctionData("depositHbar", []);
+
+    const exchangeContractId = evmAddressToContractId(exchangeAddress);
+
+    const transaction = new ContractExecuteTransaction()
+      .setContractId(exchangeContractId)
+      .setGas(800000)
+      .setFunctionParameters(Buffer.from(depositData.slice(2), "hex"))
+      .setPayableAmount(Hbar.from(Number(amountHbar), HbarUnit.Hbar));
+
+    const txResponse = await transaction.execute(client);
+    const receipt = await txResponse.getReceipt(client);
+    client.close();
+
+    res.status(200).json({
+      success: true,
+      message: "HBAR deposit to exchange successful",
+      data: {
+        transactionHash: txResponse.transactionId.toString(),
+        status: receipt.status.toString() === "SUCCESS" ? 1 : 0,
+      },
+    });
+  } catch (error: any) {
+    console.error("Error depositing HBAR:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Failed to deposit HBAR",
     });
   }
 };

@@ -12,6 +12,7 @@ import {
   spendNairaForExchange,
   swapHbarToToken,
   cashoutHbarToNaira,
+  depositHbar,
 } from "../controllers/exchange.controller";
 import { protect as authenticate } from "../middleware/auth.middleware";
 
@@ -30,6 +31,7 @@ router.post("/sign-approve", authenticate, signApprove);
  * @access  Private
  */
 router.post("/sign-deposit", authenticate, signDepositToken);
+router.post("/deposit-hbar", authenticate, depositHbar);
 
 /**
  * @route   POST /api/exchange/sign-swap

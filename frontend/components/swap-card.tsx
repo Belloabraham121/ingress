@@ -228,9 +228,36 @@ export function SwapCard() {
           transactionHash: data.data?.transactionHash,
         };
       }
-      // Case 4: HBAR → Token (Direct via Exchange)
+      // Case 4: HBAR → Token (Deposit then transfer)
       else if (fromToken.symbol === "HBAR" && toToken.address) {
         const token = getToken();
+        // Step 1: Deposit HBAR to Exchange so user's HBAR is deducted
+        try {
+          const respDeposit = await fetch(`${API_URL}/exchange/deposit-hbar`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              exchangeAddress:
+                process.env.NEXT_PUBLIC_EXCHANGE_CONTRACT ||
+                "0x1938C3345f2B6B2Fa3538713DB50f80ebA3a61d5",
+              amountHbar: amount.toString(),
+            }),
+          });
+          const depData = await respDeposit.json();
+          if (!depData.success) {
+            alert(depData.message || "❌ Deposit HBAR failed.");
+            return { success: false };
+          }
+        } catch (e) {
+          console.error("HBAR deposit error:", e);
+          alert("❌ HBAR deposit error. Please try again later.");
+          return { success: false };
+        }
+
+        // Step 2: Instruct backend to send target token to user
         const resp = await fetch(`${API_URL}/exchange/swap-hbar-token`, {
           method: "POST",
           headers: {
