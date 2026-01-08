@@ -106,6 +106,8 @@ export function StakeCard() {
         tokenAddress: confirmationDetails.tokenAddress,
         poolId: confirmationDetails.poolId,
         amount: confirmationDetails.amount,
+        poolName: `${confirmationDetails.token} Pool`,
+        tokenSymbol: confirmationDetails.token,
       });
 
       if (result.success && result.txHash) {

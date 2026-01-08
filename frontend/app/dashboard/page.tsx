@@ -12,6 +12,7 @@ import { AccountDepositsTab } from "@/components/account-deposits-tab";
 import { ProfileTab } from "@/components/profile-tab";
 import { StakingOverview } from "@/components/staking-overview";
 import { InvestmentOverview } from "@/components/investment-overview";
+import { RecentActivityCard } from "@/components/recent-activity-card";
 import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 
@@ -181,46 +182,17 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Recent Activity */}
-          <div className="mt-12 border border-border bg-background p-6">
-            <h2 className="text-lg font-sentient mb-6">RECENT ACTIVITY</h2>
-            <div className="space-y-4">
-              {[
-                {
-                  action: "Deposited 1000 USDT to USDT Vault",
-                  time: "2 hours ago",
-                  status: "Completed",
-                },
-                {
-                  action: "Deposited $2,000 to ETH Vault",
-                  time: "1 day ago",
-                  status: "Completed",
-                },
-                {
-                  action: "Swapped 50,000 NGN to USDT",
-                  time: "3 days ago",
-                  status: "Completed",
-                },
-              ].map((item, idx) => (
-                <div
-                  key={idx}
-                  className="flex justify-between items-center py-3 border-b border-border/50 last:border-0"
-                >
-                  <div>
-                    <p className="text-sm font-mono text-foreground">
-                      {item.action}
-                    </p>
-                    <p className="text-xs font-mono text-foreground/50">
-                      {item.time}
-                    </p>
-                  </div>
-                  <span className="text-xs font-mono text-green-500">
-                    {item.status}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
+          {/* Recent Activity - Dynamic based on active tab */}
+          <RecentActivityCard
+            activityType={
+              activeTab === "swap" ||
+              activeTab === "invest" ||
+              activeTab === "stake"
+                ? activeTab
+                : undefined
+            }
+            limit={5}
+          />
         </div>
       </main>
     </div>

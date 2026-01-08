@@ -8,6 +8,8 @@ export interface DepositParams {
   vaultAddress: string;
   tokenAddress: string;
   amount: string; // Amount in token units (will be converted to wei)
+  vaultName?: string; // Vault name for activity tracking
+  tokenSymbol?: string; // Token symbol for activity tracking
   onSuccess?: (txHash: string) => void;
   onError?: (error: Error) => void;
 }
@@ -40,6 +42,8 @@ export function useVaultDeposit() {
     vaultAddress,
     tokenAddress,
     amount,
+    vaultName,
+    tokenSymbol,
     onSuccess,
     onError,
   }: DepositParams) => {
@@ -113,6 +117,8 @@ export function useVaultDeposit() {
       }>("/api/vault/sign-deposit", {
         vaultAddress,
         amount: amountWei.toString(),
+        vaultName,
+        tokenSymbol,
       });
 
       console.log("✅ Deposit successful!");
@@ -124,6 +130,11 @@ export function useVaultDeposit() {
       console.log("");
 
       setTxHash(depositResponse.transactionHash);
+
+      // Dispatch event to refresh activity list
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("activityUpdated"));
+      }
 
       if (onSuccess) {
         onSuccess(depositResponse.transactionHash);

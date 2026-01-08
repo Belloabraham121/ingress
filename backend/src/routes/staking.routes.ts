@@ -2,6 +2,7 @@ import { Router } from "express";
 import {
   signApprove,
   signStake,
+  signWithdraw,
   getAllowance,
 } from "../controllers/staking.controller";
 import { protect as authenticate } from "../middleware/auth.middleware";
@@ -21,6 +22,13 @@ router.post("/sign-approve", authenticate, signApprove);
  * @access  Private (requires JWT)
  */
 router.post("/sign-stake", authenticate, signStake);
+
+/**
+ * @route   POST /api/staking/sign-withdraw
+ * @desc    Sign a stake withdrawal transaction
+ * @access  Private (requires JWT)
+ */
+router.post("/sign-withdraw", authenticate, signWithdraw);
 
 /**
  * @route   GET /api/staking/allowance
