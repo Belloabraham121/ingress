@@ -39,7 +39,7 @@ interface ExchangeHook {
   depositTokenToNaira: (
     tokenAddress: string,
     amount: string
-  ) => Promise<boolean>;
+  ) => Promise<string | null>; // Returns transaction hash or null
   depositHbarToNaira: (amount: string) => Promise<boolean>;
   initiateNairaToToken: (
     tokenAddress: string,
@@ -122,7 +122,7 @@ export const useExchange = (): ExchangeHook => {
   const depositTokenToNaira = async (
     tokenAddress: string,
     amount: string
-  ): Promise<boolean> => {
+  ): Promise<string | null> => {
     try {
       setDepositingToken(true);
       const token = getToken();
@@ -145,10 +145,11 @@ export const useExchange = (): ExchangeHook => {
       const approveData = await approveResponse.json();
       if (!approveData.success) {
         console.error("Approval failed:", approveData.message);
-        return false;
+        return null;
       }
 
       console.log("✅ Token approved!");
+      console.log("Hedera Tx:", approveData.data?.transactionHash);
 
       // Step 2: Deposit token
       console.log("Step 2: Depositing token...");
@@ -168,16 +169,20 @@ export const useExchange = (): ExchangeHook => {
       const depositData = await depositResponse.json();
       if (!depositData.success) {
         console.error("Deposit failed:", depositData.message);
-        return false;
+        return null;
       }
 
+      const txHash = depositData.data?.transactionHash;
       console.log("✅ Token deposited!");
       console.log("💰 Naira will be sent to your bank account shortly");
+      console.log(
+        `🔗 View on HashScan: https://hashscan.io/testnet/transaction/${txHash}`
+      );
 
-      return true;
+      return txHash || "Transaction completed";
     } catch (error) {
       console.error("Error depositing token:", error);
-      return false;
+      return null;
     } finally {
       setDepositingToken(false);
     }

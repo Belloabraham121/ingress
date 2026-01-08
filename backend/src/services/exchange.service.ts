@@ -6,6 +6,7 @@ import {
   ContractExecuteTransaction,
   ContractId,
 } from "@hashgraph/sdk";
+import axios from "axios";
 import { paystackService } from "./paystack.service";
 import { priceOracleService } from "./priceOracle.service";
 import { Wallet } from "../models/Wallet";
@@ -13,7 +14,7 @@ import { User } from "../models/User";
 import { BankAccount } from "../models/BankAccount";
 import { activityService } from "./activity.service";
 
-const HEDERA_TESTNET_RPC = "https://testnet.hashio.io/api";
+const HEDERA_MIRROR_NODE = "https://testnet.mirrornode.hedera.com/api/v1";
 
 // Exchange Contract Address
 const EXCHANGE_CONTRACT = "0x1938C3345f2B6B2Fa3538713DB50f80ebA3a61d5";
@@ -52,35 +53,21 @@ function evmAddressToContractId(evmAddress: string): ContractId {
  * Exchange service for handling Token ↔ Naira swaps
  */
 class ExchangeService {
-  private provider: ethers.JsonRpcProvider;
-  private exchangeContract: ethers.Contract;
   private isListening: boolean = false;
+  private pollingInterval: NodeJS.Timeout | null = null;
+  private lastProcessedTimestamp: string = "";
 
   // Admin wallet for sending tokens (should be stored securely in env)
   private adminAccountId: string;
   private adminPrivateKey: string;
 
+  // Event signatures (keccak256 hashes)
+  private readonly TOKEN_DEPOSITED_TOPIC =
+    "0xf1444b5cad7ce70cb018d1b8edc8618fe303f3c7f034d8d572a6e27facbf2bef";
+  private readonly HBAR_DEPOSITED_TOPIC =
+    "0x768b80b0d4cfe83449db42d5373dd4e52dd5d2b35b3fb1c855b7dba6eff47cf0";
+
   constructor() {
-    this.provider = new ethers.JsonRpcProvider(HEDERA_TESTNET_RPC);
-
-    // Exchange ABI with all necessary functions and events
-    const exchangeABI = [
-      "event TokenDeposited(address indexed user, address indexed token, uint256 amount)",
-      "event HbarDeposited(address indexed user, uint256 amount)",
-      "event TokenWithdrawn(address indexed to, address indexed token, uint256 amount, address indexed withdrawer)",
-      "event HbarWithdrawn(address indexed to, uint256 amount, address indexed withdrawer)",
-      "function transferToUser(address token, address to, uint256 amount)",
-      "function transferHbarToUser(address payable to, uint256 amount)",
-      "function getUserTokenBalance(address user, address token) view returns (uint256)",
-      "function getUserHbarBalance(address user) view returns (uint256)",
-    ];
-
-    this.exchangeContract = new ethers.Contract(
-      EXCHANGE_CONTRACT,
-      exchangeABI,
-      this.provider
-    );
-
     // Get admin credentials from environment
     this.adminAccountId = process.env.ADMIN_ACCOUNT_ID || "";
     this.adminPrivateKey = process.env.ADMIN_PRIVATE_KEY || "";
@@ -90,10 +77,13 @@ class ExchangeService {
         "⚠️  Admin credentials not set. Exchange event processing will be limited."
       );
     }
+
+    // Set initial timestamp to current time
+    this.lastProcessedTimestamp = new Date().toISOString();
   }
 
   /**
-   * Start listening to Exchange contract events
+   * Start listening to Exchange contract events using Hedera Mirror Node polling
    */
   async startEventListeners(): Promise<void> {
     if (this.isListening) {
@@ -101,64 +91,152 @@ class ExchangeService {
       return;
     }
 
-    console.log("🎧 Starting Exchange contract event listeners...");
+    if (process.env.DISABLE_EXCHANGE_POLLING === "true") {
+      console.log(
+        "⚠️  Exchange event polling is disabled by DISABLE_EXCHANGE_POLLING=true"
+      );
+      return;
+    }
+
+    console.log(
+      "🎧 Starting Exchange contract event polling (Hedera Mirror Node)..."
+    );
     console.log(`   Exchange Contract: ${EXCHANGE_CONTRACT}`);
+    console.log(`   Poll Interval: 10 seconds`);
 
     // Start automatic price updates (every 30 minutes)
     priceOracleService.startAutomaticUpdates(30);
 
-    // Listen for TokenDeposited events (User wants to cash out to Naira)
-    this.exchangeContract.on(
-      "TokenDeposited",
-      async (user, token, amount, event) => {
+    // Poll for events every 10 seconds
+    this.pollingInterval = setInterval(() => {
+      this.pollForEvents().catch((error) => {
+        console.error("Error polling for events:", error);
+      });
+    }, 10000); // Poll every 10 seconds
+
+    // Initial poll
+    this.pollForEvents().catch(console.error);
+
+    this.isListening = true;
+    console.log("✅ Exchange event polling started successfully");
+  }
+
+  /**
+   * Poll Hedera Mirror Node for contract events
+   */
+  private async pollForEvents(): Promise<void> {
+    try {
+      // Convert timestamp to seconds (Mirror Node uses seconds since epoch)
+      const timestampSeconds = Math.floor(
+        new Date(this.lastProcessedTimestamp).getTime() / 1000
+      );
+
+      // Query Mirror Node for contract results
+      const response = await axios.get(
+        `${HEDERA_MIRROR_NODE}/contracts/results/logs`,
+        {
+          params: {
+            "contract.id": EXCHANGE_CONTRACT,
+            order: "asc",
+            limit: 100,
+            timestamp: `gt:${timestampSeconds}`,
+          },
+        }
+      );
+
+      const logs = response.data.logs || [];
+
+      if (logs.length > 0) {
+        console.log(`\n📦 Found ${logs.length} new events to process`);
+
+        for (const log of logs) {
+          await this.processLog(log);
+
+          // Update last processed timestamp (Mirror Node returns timestamp in format "seconds.nanoseconds")
+          if (log.timestamp) {
+            this.lastProcessedTimestamp = new Date(
+              parseFloat(log.timestamp) * 1000
+            ).toISOString();
+          }
+        }
+      }
+    } catch (error: any) {
+      // Only log if it's not a 404 (no logs found)
+      if (error.response?.status !== 404 && error.response?.status !== 400) {
+        console.error("Error polling for events:", error.message);
+      }
+    }
+  }
+
+  /**
+   * Process a single log entry
+   */
+  private async processLog(log: any): Promise<void> {
+    try {
+      const topics = log.topics || [];
+      if (topics.length === 0) return;
+
+      const eventSignature = topics[0];
+      const data = log.data || "0x";
+      const transactionHash = log.transaction_hash;
+
+      // TokenDeposited(address indexed user, address indexed token, uint256 amount)
+      if (eventSignature === this.TOKEN_DEPOSITED_TOPIC) {
+        const user = "0x" + topics[1].slice(26); // Extract address from indexed parameter
+        const token = "0x" + topics[2].slice(26); // Extract address from indexed parameter
+        const amount = BigInt(data); // Non-indexed parameter
+
         console.log("\n💰 TokenDeposited Event Detected:");
         console.log(`   User: ${user}`);
         console.log(`   Token: ${token}`);
         console.log(`   Amount: ${amount.toString()}`);
-        console.log(`   Tx: ${event.log.transactionHash}`);
+        console.log(`   Tx: ${transactionHash}`);
 
         // Skip if user is address(0) - this is admin adding liquidity
-        if (user === ethers.ZeroAddress) {
+        if (
+          user.toLowerCase() === "0x0000000000000000000000000000000000000000"
+        ) {
           console.log("   ⏭️  Admin liquidity addition, skipping...");
           return;
         }
 
-        await this.handleTokenToNaira(
-          user,
-          token,
-          amount,
-          event.log.transactionHash
-        );
+        await this.handleTokenToNaira(user, token, amount, transactionHash);
       }
-    );
+      // HbarDeposited(address indexed user, uint256 amount)
+      else if (eventSignature === this.HBAR_DEPOSITED_TOPIC) {
+        const user = "0x" + topics[1].slice(26); // Extract address from indexed parameter
+        const amount = BigInt(data); // Non-indexed parameter
 
-    // Listen for HbarDeposited events (User wants to cash out HBAR to Naira)
-    this.exchangeContract.on("HbarDeposited", async (user, amount, event) => {
-      console.log("\n💰 HbarDeposited Event Detected:");
-      console.log(`   User: ${user}`);
-      console.log(`   Amount: ${amount.toString()} wei`);
-      console.log(`   Tx: ${event.log.transactionHash}`);
+        console.log("\n💰 HbarDeposited Event Detected:");
+        console.log(`   User: ${user}`);
+        console.log(`   Amount: ${amount.toString()} wei`);
+        console.log(`   Tx: ${transactionHash}`);
 
-      // Skip if user is address(0) - this is admin adding liquidity
-      if (user === ethers.ZeroAddress) {
-        console.log("   ⏭️  Admin liquidity addition, skipping...");
-        return;
+        // Skip if user is address(0) - this is admin adding liquidity
+        if (
+          user.toLowerCase() === "0x0000000000000000000000000000000000000000"
+        ) {
+          console.log("   ⏭️  Admin liquidity addition, skipping...");
+          return;
+        }
+
+        await this.handleHbarToNaira(user, amount, transactionHash);
       }
-
-      await this.handleHbarToNaira(user, amount, event.log.transactionHash);
-    });
-
-    this.isListening = true;
-    console.log("✅ Exchange event listeners started successfully");
+    } catch (error) {
+      console.error("Error processing log:", error);
+    }
   }
 
   /**
    * Stop listening to events
    */
   stopEventListeners(): void {
-    this.exchangeContract.removeAllListeners();
+    if (this.pollingInterval) {
+      clearInterval(this.pollingInterval);
+      this.pollingInterval = null;
+    }
     this.isListening = false;
-    console.log("🛑 Exchange event listeners stopped");
+    console.log("🛑 Exchange event polling stopped");
   }
 
   /**
@@ -588,33 +666,30 @@ class ExchangeService {
   ): Promise<{ output: number; rate: number }> {
     const prices = await priceOracleService.getCachedPrices();
 
-    const fromLower = fromToken.toLowerCase();
-    const toLower = toToken.toLowerCase();
+    const fromUpper = fromToken.toUpperCase();
+    const toUpper = toToken.toUpperCase();
 
     // Get fromToken rate (in NGN)
     let fromRate: number;
-    if (fromLower === "hbar" || fromToken === "HBAR") {
+    if (fromUpper === "HBAR") {
       fromRate = prices.hbar_ngn;
+    } else if (fromUpper === "NGN") {
+      fromRate = 1;
     } else {
-      const fromSymbol = TOKEN_SYMBOLS[fromLower];
+      // Check if it's an address
+      const fromSymbol = TOKEN_SYMBOLS[fromToken.toLowerCase()] || fromUpper;
       fromRate = await priceOracleService.getTokenNgnRate(fromSymbol);
     }
 
     // Get toToken rate (in NGN)
     let toRate: number;
-    if (
-      toLower === "hbar" ||
-      toToken === "HBAR" ||
-      toLower === "ngn" ||
-      toToken === "NGN"
-    ) {
-      if (toLower === "ngn" || toToken === "NGN") {
-        toRate = 1; // 1 NGN = 1 NGN
-      } else {
-        toRate = prices.hbar_ngn;
-      }
+    if (toUpper === "HBAR") {
+      toRate = prices.hbar_ngn;
+    } else if (toUpper === "NGN") {
+      toRate = 1;
     } else {
-      const toSymbol = TOKEN_SYMBOLS[toLower];
+      // Check if it's an address
+      const toSymbol = TOKEN_SYMBOLS[toToken.toLowerCase()] || toUpper;
       toRate = await priceOracleService.getTokenNgnRate(toSymbol);
     }
 

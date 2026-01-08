@@ -1,114 +1,483 @@
-"use client"
+"use client";
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { ArrowDownUp } from "lucide-react"
-import { SwapConfirmationModal } from "@/components/swap-confirmation-modal"
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ArrowDownUp, ChevronDown } from "lucide-react";
+import { SwapConfirmationModal } from "@/components/swap-confirmation-modal";
+import { useExchange, TOKENS } from "@/hooks/useExchange";
+import { getToken } from "@/lib/api";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+
+type TokenOption = {
+  symbol: string;
+  name: string;
+  address?: string;
+  logo?: string;
+};
+
+const AVAILABLE_TOKENS: TokenOption[] = [
+  { symbol: "NGN", name: "Nigerian Naira" },
+  { symbol: "USDC", name: "USD Coin", address: TOKENS.USDC },
+  { symbol: "USDT", name: "Tether USD", address: TOKENS.USDT },
+  { symbol: "DAI", name: "Dai Stablecoin", address: TOKENS.DAI },
+  { symbol: "HBAR", name: "Hedera" },
+];
+
+// Helper to get token decimals
+const getTokenDecimals = (symbol: string): number => {
+  if (symbol === "USDC" || symbol === "USDT") return 18;
+  if (symbol === "HBAR") return 8; // display purposes; on-chain is 8
+  return 18;
+};
+
+// Helper to trim trailing zeros from a decimal string
+const trimTrailingZeros = (val: string): string => {
+  return val.replace(/\.0+$|(?<=\.[0-9]*?)0+$/g, "").replace(/\.$/, "");
+};
 
 export function SwapCard() {
-  const [fromAmount, setFromAmount] = useState("")
-  const [toAmount, setToAmount] = useState("")
-  const [fromCurrency, setFromCurrency] = useState("NGN")
-  const [toCurrency, setToCurrency] = useState("USDT")
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [fromAmount, setFromAmount] = useState("");
+  const [toAmount, setToAmount] = useState("");
+  const [fromToken, setFromToken] = useState<TokenOption>(AVAILABLE_TOKENS[0]); // NGN
+  const [toToken, setToToken] = useState<TokenOption>(AVAILABLE_TOKENS[1]); // USDC
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCalculating, setIsCalculating] = useState(false);
 
-  const handleSwap = () => {
-    setFromCurrency(toCurrency)
-    setToCurrency(fromCurrency)
-    setFromAmount(toAmount)
-    setToAmount(fromAmount)
-  }
+  const {
+    rates,
+    loadingRates,
+    calculateSwap,
+    depositTokenToNaira,
+    initiateNairaToToken,
+    initiateNairaToHbar,
+    depositingToken,
+    initiatingPayment,
+  } = useExchange();
+  const API_URL =
+    process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
-  const handleConvert = (value: string) => {
-    setFromAmount(value)
-    // Mock conversion rate: 1 NGN = 0.0006 USDT
-    const converted = (Number.parseFloat(value) * 0.0006).toFixed(2)
-    setToAmount(converted || "")
-  }
+  // Calculate conversion when amount or tokens change
+  useEffect(() => {
+    if (fromAmount && fromToken && toToken && rates) {
+      calculateConversion();
+    } else {
+      setToAmount("");
+    }
+  }, [fromAmount, fromToken, toToken, rates]);
 
-  const exchangeRate =
-    fromAmount && toAmount
-      ? `1 ${fromCurrency} = ${(Number.parseFloat(toAmount) / Number.parseFloat(fromAmount)).toFixed(6)} ${toCurrency}`
-      : "0"
+  const calculateConversion = async () => {
+    if (!fromAmount || !fromToken || !toToken) return;
 
-  const handleConfirmSwap = () => {
-    // Process the swap here
-    console.log(`Swapped ${fromAmount} ${fromCurrency} to ${toAmount} ${toCurrency}`)
-    setIsModalOpen(false)
-    // Reset form
-    setFromAmount("")
-    setToAmount("")
-  }
+    setIsCalculating(true);
+    try {
+      const fromAddress = fromToken.address || fromToken.symbol;
+      const toAddress = toToken.address || toToken.symbol;
+
+      const result = await calculateSwap(
+        fromAddress,
+        toAddress,
+        parseFloat(fromAmount)
+      );
+      if (result) {
+        const toDec = getTokenDecimals(toToken.symbol);
+        const formatted = trimTrailingZeros(result.output.toFixed(toDec));
+        setToAmount(formatted);
+      }
+    } catch (error) {
+      console.error("Error calculating swap:", error);
+    } finally {
+      setIsCalculating(false);
+    }
+  };
+
+  const handleSwapTokens = () => {
+    // Swap the tokens
+    const tempToken = fromToken;
+    const tempAmount = fromAmount;
+
+    setFromToken(toToken);
+    setToToken(tempToken);
+    setFromAmount(toAmount);
+    setToAmount(tempAmount);
+  };
+
+  const getExchangeRate = () => {
+    if (!fromAmount || !toAmount || parseFloat(fromAmount) === 0) return "0";
+    const rate = parseFloat(toAmount) / parseFloat(fromAmount);
+    return `1 ${fromToken.symbol} = ${rate.toFixed(6)} ${toToken.symbol}`;
+  };
+
+  const handleConfirmSwap = async (): Promise<{
+    success: boolean;
+    transactionHash?: string;
+  }> => {
+    try {
+      const amount = parseFloat(fromAmount);
+
+      // Case 1: Token → Naira (Cash out)
+      if (toToken.symbol === "NGN" && fromToken.address) {
+        // Calculate token amount with decimals
+        let decimals = 18;
+        if (fromToken.symbol === "USDC" || fromToken.symbol === "USDT") {
+          decimals = 6;
+        }
+        const amountInSmallestUnit = (
+          amount * Math.pow(10, decimals)
+        ).toString();
+
+        const result = await depositTokenToNaira(
+          fromToken.address,
+          amountInSmallestUnit
+        );
+        if (result) {
+          resetForm();
+          return {
+            success: true,
+            transactionHash:
+              "Deposit initiated - Check your bank account in a few minutes",
+          };
+        } else {
+          alert("❌ Swap failed. Please try again.");
+          return { success: false };
+        }
+      }
+      // Case 2: Naira → Token (Buy crypto)
+      else if (fromToken.symbol === "NGN" && toToken.address) {
+        const paymentUrl = await initiateNairaToToken(toToken.address, amount);
+        if (paymentUrl) {
+          // Redirect to PayStack payment (will show success after payment)
+          window.location.href = paymentUrl;
+          return {
+            success: true,
+            transactionHash: "Redirecting to PayStack...",
+          };
+        } else {
+          alert("❌ Failed to initiate payment. Please try again.");
+          return { success: false };
+        }
+      }
+      // Case 3: Naira → HBAR
+      else if (fromToken.symbol === "NGN" && toToken.symbol === "HBAR") {
+        const paymentUrl = await initiateNairaToHbar(amount);
+        if (paymentUrl) {
+          window.location.href = paymentUrl;
+          return {
+            success: true,
+            transactionHash: "Redirecting to PayStack...",
+          };
+        } else {
+          alert("❌ Failed to initiate payment. Please try again.");
+          return { success: false };
+        }
+      }
+      // Case 4: HBAR → Naira
+      else if (fromToken.symbol === "HBAR" && toToken.symbol === "NGN") {
+        alert(
+          "⚠️ HBAR → Naira: This feature will be available soon. For now, you can use the wallet transfer feature."
+        );
+        return { success: false };
+      }
+      // Case 5: Token → Token (Direct via Exchange, no Paystack)
+      else if (fromToken.address && toToken.address) {
+        // Step 1: Deposit source token to Exchange
+        const fromDecimals = getTokenDecimals(fromToken.symbol);
+        const toDecimals = getTokenDecimals(toToken.symbol);
+
+        const amountInSmallestUnit = (
+          amount * Math.pow(10, fromDecimals)
+        ).toString();
+
+        const depositTxHash = await depositTokenToNaira(
+          fromToken.address,
+          amountInSmallestUnit
+        );
+
+        if (!depositTxHash) {
+          alert("❌ Deposit failed. Please try again.");
+          return { success: false };
+        }
+
+        // Step 2: Ask backend to send target token to user directly
+        const token = getToken();
+        const resp = await fetch(`${API_URL}/exchange/swap-token-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            fromTokenAddress: fromToken.address,
+            toTokenAddress: toToken.address,
+            fromAmountSmallest: amountInSmallestUnit,
+            fromTokenDecimals: fromDecimals,
+            toTokenDecimals: toDecimals,
+          }),
+        });
+
+        const data = await resp.json();
+        if (!data.success) {
+          alert(data.message || "❌ Swap failed on server.");
+          return { success: false };
+        }
+
+        resetForm();
+        return {
+          success: true,
+          transactionHash: data.data?.transactionHash || "Swap executed",
+        };
+      }
+      // Case 6: Token → HBAR or HBAR → Token
+      else {
+        alert(
+          "⚠️ This swap combination is not yet supported. Supported swaps:\n\n" +
+            "✅ Token ↔ NGN\n" +
+            "✅ HBAR ↔ NGN\n" +
+            "✅ Token ↔ Token (via NGN)\n"
+        );
+        return { success: false };
+      }
+    } catch (error) {
+      console.error("Error during swap:", error);
+      alert("❌ An error occurred. Please try again.");
+      return { success: false };
+    }
+  };
+
+  const resetForm = () => {
+    setFromAmount("");
+    setToAmount("");
+  };
+
+  const isSwapDisabled =
+    !fromAmount ||
+    !toAmount ||
+    parseFloat(fromAmount) <= 0 ||
+    loadingRates ||
+    isCalculating;
+  const isProcessing = depositingToken || initiatingPayment;
 
   return (
     <>
       <div className="border border-border bg-background p-6 space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-sentient">Swap Assets</h3>
+          {loadingRates && (
+            <span className="text-xs font-mono text-foreground/60">
+              Loading rates...
+            </span>
+          )}
+        </div>
+
+        {/* From Section */}
         <div>
-          <label className="block text-sm font-mono text-foreground/60 mb-3">FROM</label>
-          <div className="flex gap-3">
+          <label className="block text-sm font-mono text-foreground/60 mb-3">
+            FROM
+          </label>
+          <div className="space-y-3">
+            {/* Token Selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="w-full px-4 py-3 border border-border bg-background hover:border-primary/50 transition-colors flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-primary font-mono text-xs font-bold">
+                        {fromToken.symbol.substring(0, 2)}
+                      </span>
+                    </div>
+                    <div className="text-left">
+                      <div className="font-mono text-sm font-medium">
+                        {fromToken.symbol}
+                      </div>
+                      <div className="text-xs text-foreground/50">
+                        {fromToken.name}
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-foreground/60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                {AVAILABLE_TOKENS.filter(
+                  (t) => t.symbol !== toToken.symbol
+                ).map((token) => (
+                  <DropdownMenuItem
+                    key={token.symbol}
+                    onClick={() => setFromToken(token)}
+                    className="cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-primary font-mono text-xs font-bold">
+                          {token.symbol.substring(0, 2)}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="font-mono text-sm font-medium">
+                          {token.symbol}
+                        </div>
+                        <div className="text-xs text-foreground/50">
+                          {token.name}
+                        </div>
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Amount Input */}
             <Input
               type="number"
               placeholder="0.00"
               value={fromAmount}
-              onChange={(e) => handleConvert(e.target.value)}
-              className="flex-1 bg-background border-border text-foreground placeholder:text-foreground/30"
+              onChange={(e) => setFromAmount(e.target.value)}
+              className="text-2xl h-14 bg-background border-border text-foreground placeholder:text-foreground/30 font-mono"
+              step="any"
+              min="0"
             />
-            <select
-              value={fromCurrency}
-              onChange={(e) => setFromCurrency(e.target.value)}
-              className="px-4 py-2 bg-background border border-border text-foreground font-mono text-sm cursor-pointer hover:border-primary/50 transition-colors"
-            >
-              <option>NGN</option>
-              <option>USD</option>
-              <option>EUR</option>
-            </select>
           </div>
         </div>
 
+        {/* Swap Button */}
         <div className="flex justify-center">
-          <button onClick={handleSwap} className="p-2 border border-border hover:border-primary/50 transition-colors">
+          <button
+            onClick={handleSwapTokens}
+            className="p-3 border border-border hover:border-primary transition-colors hover:bg-primary/5 active:scale-95 transform"
+            disabled={isProcessing}
+          >
             <ArrowDownUp className="w-5 h-5 text-primary" />
           </button>
         </div>
 
+        {/* To Section */}
         <div>
-          <label className="block text-sm font-mono text-foreground/60 mb-3">TO</label>
-          <div className="flex gap-3">
-            <Input
-              type="number"
-              placeholder="0.00"
-              value={toAmount}
-              readOnly
-              className="flex-1 bg-background border-border text-foreground placeholder:text-foreground/30"
-            />
-            <select
-              value={toCurrency}
-              onChange={(e) => setToCurrency(e.target.value)}
-              className="px-4 py-2 bg-background border border-border text-foreground font-mono text-sm cursor-pointer hover:border-primary/50 transition-colors"
-            >
-              <option>USDT</option>
-              <option>USDC</option>
-              <option>ETH</option>
-            </select>
+          <label className="block text-sm font-mono text-foreground/60 mb-3">
+            TO
+          </label>
+          <div className="space-y-3">
+            {/* Token Selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="w-full px-4 py-3 border border-border bg-background hover:border-primary/50 transition-colors flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-primary font-mono text-xs font-bold">
+                        {toToken.symbol.substring(0, 2)}
+                      </span>
+                    </div>
+                    <div className="text-left">
+                      <div className="font-mono text-sm font-medium">
+                        {toToken.symbol}
+                      </div>
+                      <div className="text-xs text-foreground/50">
+                        {toToken.name}
+                      </div>
+                    </div>
+                  </div>
+                  <ChevronDown className="w-4 h-4 text-foreground/60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-[--radix-dropdown-menu-trigger-width]">
+                {AVAILABLE_TOKENS.filter(
+                  (t) => t.symbol !== fromToken.symbol
+                ).map((token) => (
+                  <DropdownMenuItem
+                    key={token.symbol}
+                    onClick={() => setToToken(token)}
+                    className="cursor-pointer"
+                  >
+                    <div className="flex items-center gap-3 w-full">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <span className="text-primary font-mono text-xs font-bold">
+                          {token.symbol.substring(0, 2)}
+                        </span>
+                      </div>
+                      <div>
+                        <div className="font-mono text-sm font-medium">
+                          {token.symbol}
+                        </div>
+                        <div className="text-xs text-foreground/50">
+                          {token.name}
+                        </div>
+                      </div>
+                    </div>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Amount Display */}
+            <div className="relative">
+              <Input
+                type="text"
+                placeholder="0.00"
+                value={toAmount}
+                readOnly
+                className="text-2xl h-14 bg-background border-border text-foreground placeholder:text-foreground/30 font-mono"
+              />
+              {isCalculating && (
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <Button onClick={() => setIsModalOpen(true)} disabled={!fromAmount || !toAmount} className="w-full">
-          [SWAP]
+        {/* Exchange Rate Display */}
+        {fromAmount && toAmount && (
+          <div className="px-4 py-3 bg-primary/5 border border-primary/20">
+            <div className="flex items-center justify-between text-sm font-mono">
+              <span className="text-foreground/60">Exchange Rate</span>
+              <span className="text-primary font-medium">
+                {getExchangeRate()}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Current Rates Info */}
+        {rates && !loadingRates && (
+          <div className="text-xs font-mono text-foreground/50 space-y-1">
+            <div>Current rates (live):</div>
+            <div className="pl-2">
+              1 USDC = ₦{rates[TOKENS.USDC.toLowerCase()]?.toFixed(2)}
+            </div>
+            <div className="pl-2">
+              1 USDT = ₦{rates[TOKENS.USDT.toLowerCase()]?.toFixed(2)}
+            </div>
+            <div className="pl-2">1 HBAR = ₦{rates.hbar?.toFixed(2)}</div>
+          </div>
+        )}
+
+        {/* Swap Button */}
+        <Button
+          onClick={() => setIsModalOpen(true)}
+          disabled={isSwapDisabled || isProcessing}
+          className="w-full h-12 text-base"
+        >
+          {isProcessing ? "[PROCESSING...]" : "[SWAP]"}
         </Button>
       </div>
 
+      {/* Confirmation Modal */}
       <SwapConfirmationModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
         onConfirm={handleConfirmSwap}
         fromAmount={fromAmount}
-        fromCurrency={fromCurrency}
+        fromCurrency={fromToken.symbol}
         toAmount={toAmount}
-        toCurrency={toCurrency}
-        exchangeRate={exchangeRate}
+        toCurrency={toToken.symbol}
+        exchangeRate={getExchangeRate()}
       />
     </>
-  )
+  );
 }

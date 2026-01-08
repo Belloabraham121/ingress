@@ -252,6 +252,11 @@ class PriceOracleService {
   async getTokenNgnRate(tokenSymbol: string): Promise<number> {
     const prices = await this.getCachedPrices();
 
+    if (!tokenSymbol) {
+      console.error("Token symbol is undefined");
+      return 0;
+    }
+
     switch (tokenSymbol.toUpperCase()) {
       case "HBAR":
         return prices.hbar_ngn;
@@ -261,8 +266,11 @@ class PriceOracleService {
         return prices.usdt_ngn;
       case "DAI":
         return prices.dai_ngn;
+      case "NGN":
+        return 1; // 1 NGN = 1 NGN
       default:
-        throw new Error(`Unsupported token: ${tokenSymbol}`);
+        console.error(`Unsupported token: ${tokenSymbol}`);
+        return 0;
     }
   }
 

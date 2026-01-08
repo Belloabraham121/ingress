@@ -7,6 +7,8 @@ import {
   getExchangeRates,
   calculateSwapOutput,
   initiateNairaToTokenPayment,
+  swapTokenToToken,
+  cashoutTokenToNaira,
 } from "../controllers/exchange.controller";
 import { protect as authenticate } from "../middleware/auth.middleware";
 
@@ -61,5 +63,19 @@ router.post("/calculate", authenticate, calculateSwapOutput);
  * @access  Private
  */
 router.post("/initiate-payment", authenticate, initiateNairaToTokenPayment);
+
+/**
+ * @route   POST /api/exchange/swap-token-token
+ * @desc    Direct token-to-token swap using exchange liquidity
+ * @access  Private
+ */
+router.post("/swap-token-token", authenticate, swapTokenToToken);
+
+/**
+ * @route   POST /api/exchange/cashout-token
+ * @desc    Cash out token to Naira immediately after deposit
+ * @access  Private
+ */
+router.post("/cashout-token", authenticate, cashoutTokenToNaira);
 
 export default router;
