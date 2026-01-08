@@ -21,7 +21,7 @@ contract DeployUSDTVault is Script {
     address constant VAULT_FACTORY = 0x29021eaeb230Bc84120C0f05FDD83C446270c4f7;
 
     /// @notice USDT token address (already deployed)
-    address constant USDT = 0xaaa4e4EdA96fb9A9eBA3A10cC4d274c63846C81d;
+    address constant USDT = 0xd4E61131Ed9C3dd610727655aE8254B286deE95c;
 
     // ============ Vault Parameters ============
 

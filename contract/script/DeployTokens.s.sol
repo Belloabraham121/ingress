@@ -38,20 +38,20 @@ contract DeployTokens is Script {
         console.log("");
 
         // Deploy USDC
-        //    console.log("Deploying USDC...");
-        //    MockERC20 usdc = new MockERC20("USD Coin", "USDC", 18, 0);
-        //    usdc.mint(deployer, MINT_AMOUNT);
-        //    console.log("  USDC deployed at:", address(usdc));
-        //    console.log("  Minted", MINT_AMOUNT / 1e18, "USDC");
-        //    console.log("");
+        console.log("Deploying USDC...");
+        MockERC20 usdc = new MockERC20("USD Coin", "USDC", 18, 0);
+        usdc.mint(deployer, MINT_AMOUNT);
+        console.log("  USDC deployed at:", address(usdc));
+        console.log("  Minted", MINT_AMOUNT / 1e18, "USDC");
+        console.log("");
 
-        //    // Deploy DAI
-        //    console.log("Deploying DAI...");
-        //    MockERC20 dai = new MockERC20("Dai Stablecoin", "DAI", 18, 0);
-        //    dai.mint(deployer, MINT_AMOUNT);
-        //    console.log("  DAI deployed at:", address(dai));
-        //    console.log("  Minted", MINT_AMOUNT / 1e18, "DAI");
-        //    console.log("");
+        // Deploy DAI
+        console.log("Deploying DAI...");
+        MockERC20 dai = new MockERC20("Dai Stablecoin", "DAI", 18, 0);
+        dai.mint(deployer, MINT_AMOUNT);
+        console.log("  DAI deployed at:", address(dai));
+        console.log("  Minted", MINT_AMOUNT / 1e18, "DAI");
+        console.log("");
 
         vm.stopBroadcast();
 
@@ -64,8 +64,8 @@ contract DeployTokens is Script {
         );
         console.log("");
         console.log("USDT:", address(usdt));
-        //    console.log("USDC:", address(usdc));
-        //    console.log("DAI:", address(dai));
+        console.log("USDC:", address(usdc));
+        console.log("DAI:", address(dai));
         console.log("");
         console.log("=================================================");
     }

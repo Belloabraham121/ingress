@@ -21,7 +21,7 @@ contract DeployUSDCVault is Script {
     address constant VAULT_FACTORY = 0x29021eaeb230Bc84120C0f05FDD83C446270c4f7;
 
     /// @notice USDC token address (already deployed)
-    address constant USDC = 0xc519BfbD99A7c3b930E74259aA41a7C229B46599;
+    address constant USDC = 0x125D3f690f281659Dd7708D21688BC83Ee534aE6;
 
     // ============ Vault Parameters ============
 
