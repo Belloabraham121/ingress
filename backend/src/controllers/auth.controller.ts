@@ -5,6 +5,41 @@ import { Wallet } from "../models/Wallet";
 import { walletGeneratorService } from "../services/walletGenerator.service";
 import { blockchainService } from "../services/blockchain.service";
 import { env } from "../config/env";
+import { ethers } from "ethers";
+import {
+  ContractExecuteTransaction,
+  AccountId,
+  PrivateKey,
+  ContractId,
+} from "@hashgraph/sdk";
+
+function evmAddressToContractId(evmAddress: string): ContractId {
+  const cleanAddress = evmAddress.startsWith("0x")
+    ? evmAddress.slice(2)
+    : evmAddress;
+  return ContractId.fromEvmAddress(0, 0, cleanAddress);
+}
+
+async function resolveRecipientToEvm(to: string): Promise<string> {
+  if (/^\d+\.\d+\.\d+$/.test(to)) {
+    // Hedera account ID → fetch EVM via mirror node
+    const resp = await fetch(
+      `https://testnet.mirrornode.hedera.com/api/v1/accounts/${to}`
+    );
+    if (!resp.ok)
+      throw new Error("Failed to resolve account ID to EVM address");
+    const data = await resp.json();
+    const evm = data.evm_address
+      ? data.evm_address.startsWith("0x")
+        ? data.evm_address
+        : `0x${data.evm_address}`
+      : null;
+    if (!evm) throw new Error("No EVM address for provided account ID");
+    return evm;
+  }
+  // assume EVM address
+  return to;
+}
 
 /**
  * Generate JWT token
@@ -534,6 +569,106 @@ export const getWalletBalance = async (
       success: false,
       message: "Error fetching wallet balance",
       error: (error as Error).message,
+    });
+  }
+};
+
+/**
+ * Transfer ERC20 token to an account ID or EVM address
+ * POST /api/auth/transfer-token
+ */
+export const transferToken = async (
+  req: Request,
+  res: Response
+): Promise<void> => {
+  try {
+    const userId = (req as any).user.id;
+    const {
+      tokenAddress,
+      to,
+      amount,
+      decimals = 18,
+    } = req.body as {
+      tokenAddress: string;
+      to: string;
+      amount: string;
+      decimals?: number;
+    };
+
+    if (!tokenAddress || !to || !amount) {
+      res.status(400).json({
+        success: false,
+        message: "tokenAddress, to and amount are required",
+      });
+      return;
+    }
+
+    const wallet = await Wallet.findOne({ userId });
+    if (!wallet) {
+      res.status(404).json({ success: false, message: "Wallet not found" });
+      return;
+    }
+
+    const recipientEvm = await resolveRecipientToEvm(to);
+
+    // Decrypt private key
+    const privateKeyHex = walletGeneratorService.decryptPrivateKey(
+      wallet.encryptedPrivateKey,
+      wallet.iv,
+      wallet.authTag
+    );
+
+    // Initialize Hedera client with user's account
+    const accountId = AccountId.fromString(wallet.accountId);
+    const privateKey = PrivateKey.fromStringECDSA(privateKeyHex);
+    const client = (await import("@hashgraph/sdk")).Client.forTestnet();
+    client.setOperator(accountId, privateKey);
+
+    // Encode ERC20 transfer(to, amount)
+    const iface = new ethers.Interface([
+      "function transfer(address to, uint256 amount) returns (bool)",
+    ]);
+    const amountSmallest = ethers.parseUnits(amount, Number(decimals));
+    const data = iface.encodeFunctionData("transfer", [
+      recipientEvm,
+      amountSmallest,
+    ]);
+
+    // Execute on token contract
+    const tokenContractId = evmAddressToContractId(tokenAddress);
+    const tx = new ContractExecuteTransaction()
+      .setContractId(tokenContractId)
+      .setGas(500000)
+      .setFunctionParameters(Buffer.from(data.slice(2), "hex"));
+
+    const resp = await tx.execute(client);
+    const receipt = await resp.getReceipt(client);
+    const status = receipt.status.toString();
+    client.close();
+
+    if (status !== "SUCCESS") {
+      res.status(400).json({
+        success: false,
+        message: `Token transfer failed: ${status}`,
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "Token transferred successfully",
+      data: {
+        transactionHash: resp.transactionId.toString(),
+        to: recipientEvm,
+        amount,
+        tokenAddress,
+      },
+    });
+  } catch (error: any) {
+    console.error("Transfer token error:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message || "Error transferring token",
     });
   }
 };

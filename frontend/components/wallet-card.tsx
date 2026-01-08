@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBankAccount } from "@/hooks/useBankAccount";
 import { Button } from "@/components/ui/button";
 import { HbarTransferConfirmationModal } from "@/components/hbar-transfer-confirmation-modal";
+import { TokenTransferModal } from "./token-transfer-modal";
 import { getAllTokenBalances } from "@/lib/hedera-utils";
 
 interface Asset {
@@ -24,6 +25,8 @@ export function WalletCard() {
   const [isLoading, setIsLoading] = useState(true);
   const [showSendHbar, setShowSendHbar] = useState(false);
   const [showTransferHbar, setShowTransferHbar] = useState(false);
+  const [showTokenTransfer, setShowTokenTransfer] = useState(false);
+  const [selectedToken, setSelectedToken] = useState<Asset | null>(null);
   const [sendAmount, setSendAmount] = useState("");
   const [transferAmount, setTransferAmount] = useState("");
   const [recipientAccountId, setRecipientAccountId] = useState("");
@@ -342,7 +345,7 @@ export function WalletCard() {
           ) : (
             <>
               {/* Table Header */}
-              <div className="grid grid-cols-4 gap-4 mb-4 pb-4 border-b border-border/50">
+              <div className="grid grid-cols-5 gap-4 mb-4 pb-4 border-b border-border/50">
                 <div className="text-xs font-mono text-foreground/60">
                   ASSET
                 </div>
@@ -355,6 +358,9 @@ export function WalletCard() {
                 <div className="text-xs font-mono text-foreground/60 text-right">
                   VALUE (USD)
                 </div>
+                <div className="text-xs font-mono text-foreground/60 text-right">
+                  ACTION
+                </div>
               </div>
 
               {/* Table Rows */}
@@ -363,7 +369,7 @@ export function WalletCard() {
                   assets.map((asset, idx) => (
                     <div
                       key={idx}
-                      className="grid grid-cols-4 gap-4 py-3 border-b border-border/30 last:border-0"
+                      className="grid grid-cols-5 gap-4 py-3 border-b border-border/30 last:border-0"
                     >
                       <div className="text-sm font-mono text-foreground">
                         {asset.name}
@@ -381,6 +387,17 @@ export function WalletCard() {
                         {asset.value.toLocaleString(undefined, {
                           maximumFractionDigits: 2,
                         })}
+                      </div>
+                      <div className="text-right">
+                        <button
+                          className="text-xs font-mono text-primary hover:opacity-80"
+                          onClick={() => {
+                            setSelectedToken(asset);
+                            setShowTokenTransfer(true);
+                          }}
+                        >
+                          [SEND]
+                        </button>
                       </div>
                     </div>
                   ))
@@ -420,6 +437,13 @@ export function WalletCard() {
         amount={transferAmount}
         senderAccountId={currentUserAccountId}
         currentBalance={walletBalance.toString()}
+      />
+
+      {/* Token Transfer Modal */}
+      <TokenTransferModal
+        isOpen={showTokenTransfer}
+        onClose={() => setShowTokenTransfer(false)}
+        token={selectedToken}
       />
     </div>
   );

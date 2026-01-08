@@ -10,6 +10,8 @@ import {
   swapTokenToToken,
   cashoutTokenToNaira,
   spendNairaForExchange,
+  swapHbarToToken,
+  cashoutHbarToNaira,
 } from "../controllers/exchange.controller";
 import { protect as authenticate } from "../middleware/auth.middleware";
 
@@ -71,6 +73,7 @@ router.post("/initiate-payment", authenticate, initiateNairaToTokenPayment);
  * @access  Private
  */
 router.post("/swap-token-token", authenticate, swapTokenToToken);
+router.post("/swap-hbar-token", authenticate, swapHbarToToken);
 
 /**
  * @route   POST /api/exchange/cashout-token
@@ -78,6 +81,7 @@ router.post("/swap-token-token", authenticate, swapTokenToToken);
  * @access  Private
  */
 router.post("/cashout-token", authenticate, cashoutTokenToNaira);
+router.post("/cashout-hbar", authenticate, cashoutHbarToNaira);
 
 /**
  * @route   POST /api/exchange/spend-naira
