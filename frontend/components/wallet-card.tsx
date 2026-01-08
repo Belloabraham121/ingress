@@ -43,14 +43,22 @@ export function WalletCard() {
 
     // Auto-refresh every 30 seconds
     const interval = setInterval(loadBalances, 30000);
-    return () => clearInterval(interval);
+    const onWalletUpdated = () => loadBalances();
+    window.addEventListener("walletUpdated", onWalletUpdated);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("walletUpdated", onWalletUpdated);
+    };
   }, []);
 
   const loadBalances = async () => {
     try {
-      // Load wallet balance from profile
-      const profile = await getProfile();
-      setWalletBalance(profile.wallet.balance || 0);
+      // Load wallet balance (live) and profile
+      const [profile, liveBalance] = await Promise.all([
+        getProfile(),
+        getWalletBalance(),
+      ]);
+      setWalletBalance(liveBalance.balance || profile.wallet.balance || 0);
       const accountId = profile.wallet.accountId || "";
       setCurrentUserAccountId(accountId);
 

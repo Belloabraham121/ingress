@@ -5,6 +5,7 @@ import type React from "react";
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
+import { getEvmAddressFromAccountId } from "@/lib/hedera-utils";
 import { useBankAccount } from "@/hooks/useBankAccount";
 import type { BankAccount, Transaction } from "@/types/api";
 
@@ -20,6 +21,7 @@ export function ProfileTab() {
   const [user, setUser] = useState<any>(null);
   const [wallet, setWallet] = useState<any>(null);
   const [bankAccount, setBankAccount] = useState<BankAccount | null>(null);
+  const [evmResolved, setEvmResolved] = useState<string>("");
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -39,6 +41,17 @@ export function ProfileTab() {
       const profile = await getProfile();
       setUser(profile.user);
       setWallet(profile.wallet);
+      // Resolve EVM from mirror node using accountId
+      if (profile.wallet?.accountId) {
+        try {
+          const evm = await getEvmAddressFromAccountId(
+            profile.wallet.accountId
+          );
+          setEvmResolved(evm);
+        } catch (e) {
+          console.warn("Failed to resolve EVM from mirror node:", e);
+        }
+      }
       setEditForm({
         firstName: profile.user.firstName,
         lastName: profile.user.lastName,
@@ -63,6 +76,46 @@ export function ProfileTab() {
       setIsLoading(false);
     }
   };
+
+  // Listen for payment events and page focus to refresh bank balance immediately
+  useEffect(() => {
+    let pollTimer: any = null;
+    const refreshBank = async () => {
+      try {
+        const updated = await getBankAccountDetails();
+        setBankAccount(updated);
+      } catch {}
+    };
+
+    const startShortPoll = () => {
+      let attempts = 0;
+      clearInterval(pollTimer);
+      pollTimer = setInterval(async () => {
+        attempts++;
+        await refreshBank();
+        if (attempts >= 30) {
+          clearInterval(pollTimer);
+        }
+      }, 3000); // 3s for ~90s total
+    };
+
+    const onPaymentStarted = () => startShortPoll();
+    const onWalletUpdated = () => refreshBank();
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") refreshBank();
+    };
+
+    window.addEventListener("paymentStarted", onPaymentStarted);
+    window.addEventListener("walletUpdated", onWalletUpdated);
+    document.addEventListener("visibilitychange", onVisibility);
+
+    return () => {
+      clearInterval(pollTimer);
+      window.removeEventListener("paymentStarted", onPaymentStarted);
+      window.removeEventListener("walletUpdated", onWalletUpdated);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [getBankAccountDetails]);
 
   const [editForm, setEditForm] = useState({
     firstName: "",
@@ -321,10 +374,12 @@ export function ProfileTab() {
           {showWalletAddress ? (
             <div className="flex items-center gap-3">
               <p className="text-sm font-mono text-foreground break-all">
-                {wallet.evmAddress}
+                {evmResolved || wallet.evmAddress}
               </p>
               <button
-                onClick={() => copyToClipboard(wallet.evmAddress)}
+                onClick={() =>
+                  copyToClipboard(evmResolved || wallet.evmAddress)
+                }
                 className="px-3 py-2 border border-border text-xs font-mono text-foreground/60 hover:border-primary hover:text-primary transition-colors [clip-path:polygon(2px_0,calc(100%_-_2px)_0,100%_2px,100%_calc(100%_-_2px),calc(100%_-_2px)_100%,2px_100%,0_calc(100%_-_2px),0_2px)]"
               >
                 [COPY]
