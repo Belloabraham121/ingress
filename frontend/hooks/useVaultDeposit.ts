@@ -131,9 +131,11 @@ export function useVaultDeposit() {
 
       setTxHash(depositResponse.transactionHash);
 
-      // Dispatch event to refresh activity list
+      // Dispatch events to refresh activity list and positions
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("activityUpdated"));
+        window.dispatchEvent(new Event("positionsUpdated"));
+        window.dispatchEvent(new Event("vaultUpdated"));
       }
 
       if (onSuccess) {

@@ -190,6 +190,13 @@ export function useUserStakingPositions(userEvmAddress?: string) {
 
   useEffect(() => {
     fetchUserPositions();
+    const onUpdated = () => fetchUserPositions();
+    window.addEventListener("stakingUpdated", onUpdated);
+    window.addEventListener("positionsUpdated", onUpdated);
+    return () => {
+      window.removeEventListener("stakingUpdated", onUpdated);
+      window.removeEventListener("positionsUpdated", onUpdated);
+    };
   }, [fetchUserPositions]);
 
   return {
