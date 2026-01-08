@@ -8,6 +8,7 @@ import {
   transferHBAR,
   getWalletBalance,
   transferToken,
+  logout,
 } from "../controllers/auth.controller";
 import { protect } from "../middleware/auth.middleware";
 
@@ -24,5 +25,6 @@ router.post("/send-hbar", protect, sendHBAR);
 router.post("/transfer-hbar", protect, transferHBAR);
 router.post("/transfer-token", protect, transferToken);
 router.get("/wallet-balance", protect, getWalletBalance);
+router.post("/logout", protect, logout);
 
 export default router;

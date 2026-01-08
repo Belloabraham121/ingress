@@ -158,7 +158,10 @@ export function useAuth() {
   };
 
   // Logout
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api.post<{}>("/api/auth/logout");
+    } catch {}
     removeToken();
     router.push("/signin");
   };
