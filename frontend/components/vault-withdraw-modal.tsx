@@ -11,6 +11,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { SuccessModal } from "@/components/success-modal";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface VaultWithdrawModalProps {
   isOpen: boolean;
@@ -34,20 +36,34 @@ export function VaultWithdrawModal({
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [transactionHash, setTransactionHash] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
   const handleConfirm = async () => {
     setIsProcessing(true);
+    setError(null);
     try {
       const result = await onConfirm();
       if (result.success && result.txHash) {
         setTransactionHash(result.txHash);
         setShowSuccess(true);
+      } else {
+        setError("Withdrawal failed. Please check your balance and try again.");
       }
-    } catch (error) {
-      console.error("Error in confirmation:", error);
+    } catch (err: any) {
+      console.error("Error in confirmation:", err);
+      const errorMessage =
+        err.response?.data?.message ||
+        err.message ||
+        "Withdrawal failed. Please check your balance and try again.";
+      setError(errorMessage);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleClose = () => {
+    setError(null);
+    onClose();
   };
 
   const handleSuccessClose = () => {
@@ -62,7 +78,7 @@ export function VaultWithdrawModal({
 
   return (
     <>
-      <Dialog open={isOpen && !showSuccess} onOpenChange={onClose}>
+      <Dialog open={isOpen && !showSuccess} onOpenChange={handleClose}>
         <DialogContent className="border border-border bg-background max-w-md [clip-path:polygon(0_0,calc(100%_-_16px)_0,100%_0,100%_calc(100%_-_16px),calc(100%_-_16px)_100%,0_100%,0_16px)]">
           <DialogHeader>
             <DialogTitle className="text-2xl font-sentient">
@@ -126,10 +142,20 @@ export function VaultWithdrawModal({
             </p>
           </div>
 
+          {/* Error Display */}
+          {error && (
+            <Alert variant="destructive" className="mt-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription className="font-mono text-xs">
+                {error}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Action Buttons */}
           <DialogFooter className="flex gap-3 pt-6">
             <button
-              onClick={onClose}
+              onClick={handleClose}
               disabled={isProcessing}
               className="flex-1 px-6 py-3 border border-border text-foreground font-mono text-sm font-medium transition-all duration-300 hover:border-primary/50 hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed [clip-path:polygon(0_0,calc(100%_-_12px)_0,100%_0,100%_calc(100%_-_12px),calc(100%_-_12px)_100%,0_100%,0_12px)]"
             >

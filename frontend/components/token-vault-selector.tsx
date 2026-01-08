@@ -32,7 +32,12 @@ interface TokenVault {
 export function TokenVaultSelector() {
   const { vaults, isLoading, error, refresh } = useVaults();
   const { deposit, isDepositing, error: depositError } = useVaultDeposit();
-  const { withdraw, isWithdrawing, error: withdrawError } = useVaultWithdraw();
+  const {
+    withdraw,
+    isWithdrawing,
+    error: withdrawError,
+    setError: setWithdrawError,
+  } = useVaultWithdraw();
   const { toast } = useToast();
   const [selectedVault, setSelectedVault] = useState<string>("");
   const [depositAmount, setDepositAmount] = useState("");
@@ -162,6 +167,9 @@ export function TokenVaultSelector() {
   const handleWithdrawClick = () => {
     if (!selected || !withdrawAmount) return;
 
+    // Clear any previous errors
+    setWithdrawError(null);
+
     // Get current balance from vault
     const currentVault = vaults?.find(
       (v) => v.vaultAddress === selected.vaultAddress
@@ -196,22 +204,31 @@ export function TokenVaultSelector() {
       if (result.success && result.txHash) {
         // Refresh vault data after successful withdrawal
         refresh();
-        // Clear withdraw amount
+        // Clear withdraw amount and any errors
         setWithdrawAmount("");
+        setWithdrawError(null);
         return { success: true, txHash: result.txHash };
       } else {
+        // Error will be set by the hook, but also show toast
+        const errorMsg = withdrawError || "Failed to withdraw from vault";
         toast({
           title: "Withdrawal Failed ❌",
-          description: "Failed to withdraw from vault",
+          description: errorMsg,
           variant: "destructive",
         });
         return { success: false };
       }
     } catch (err: any) {
       console.error("Withdrawal error:", err);
+      // Error will be set by the hook, extract the message from API response if available
+      const errorMsg =
+        err.response?.data?.message ||
+        err.message ||
+        withdrawError ||
+        "Failed to withdraw from vault";
       toast({
         title: "Withdrawal Failed ❌",
-        description: err.message || "Failed to withdraw from vault",
+        description: errorMsg,
         variant: "destructive",
       });
       return { success: false };
@@ -256,6 +273,14 @@ export function TokenVaultSelector() {
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>{depositError}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Withdrawal Error State */}
+        {withdrawError && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{withdrawError}</AlertDescription>
           </Alert>
         )}
 
