@@ -1,34 +1,36 @@
-## Ingress — Unified On‑Chain Investing, Staking, and Swaps
+## Ingress — All‑In‑One Money App for the Unbanked
 
-Ingress is a modern, user‑friendly DeFi application that brings token swaps, yield‑earning vaults, and staking pools into a single, cohesive experience. It’s designed for everyday users who want transparent yields and fast, low‑fee transactions, and for institutions that need a clean, auditable flow for digital asset operations.
+Ingress is the all‑in‑one money app for the unbanked. Send and swap Naira, buy and send USDT, and seamlessly bridge bank rails and crypto—then stake and invest for yield—in one secure, simple platform.
 
 ### Why Ingress
 
-- **All‑in‑one**: Swap tokens, stake for rewards, and allocate into vaults in one place.
-- **Fast and low‑cost**: Built with performance and low fees in mind.
-- **Trust‑by‑design**: On‑chain smart contracts, verifiable rewards, and transparent accounting.
-- **User‑centric**: Clear portfolio views, intuitive actions, and meaningful insights.
+- **All‑in‑one Platform**: Swap assets, stake for rewards, and invest in yield strategies—all in one place.
+- **Bridging Traditional and Crypto Finance**: Send and swap Naira, buy USDT, and seamlessly bridge bank rails with blockchain.
+- **Fast and Low‑Cost**: Built with performance and low fees in mind on Hedera Hashgraph.
+- **Trust‑by‑Design**: On‑chain smart contracts, verifiable rewards, and transparent accounting.
+- **Democratized Access**: Sophisticated investment strategies accessible to everyone, from beginners to experienced traders.
 
 ---
 
 ### What You Can Do
 
-- **Swap tokens instantly**: Execute on‑chain swaps with a simple, familiar UX.
-- **Stake for rewards**: Choose from multiple staking pools with clear APRs and lock terms.
-- **Deposit into vaults**: Allocate stablecoins and tokens into strategy vaults for automated yield.
-- **Track your portfolio**: See balances, positions, and transaction history in one dashboard.
-- **Manage wallet & transfers**: Connect your wallet, move tokens, and view confirmations.
+- **Send and Swap Naira**: Seamlessly exchange between Naira and cryptocurrencies with real-time conversion rates.
+- **Buy and Send USDT**: Purchase USDT and other cryptocurrencies, then send them to any wallet.
+- **Swap Assets Instantly**: Execute on‑chain swaps with a simple, familiar UX and minimal fees.
+- **Stake & Earn**: Earn daily rewards by staking USDT, USDC, or DAI in secure staking pools with competitive APY rates.
+- **Invest Strategically**: Choose from Conservative, Balanced, or Growth investment strategies via automated yield vaults.
+- **Track Your Portfolio**: See balances, positions, and transaction history in real-time with comprehensive analytics.
 
 ---
 
 ### Key Features at a Glance
 
-- **Clean Dashboard**: High‑signal overview of holdings, allocated capital, and rewards.
-- **Token Swap**: AMM‑style swapping with slippage controls and detailed transaction previews.
-- **Staking Pools**: Multiple pools, time‑bound or flexible, with clear emissions and claim flows.
-- **Vaults**: Stablecoin and token vaults for automated strategies and reward accrual.
-- **Transaction History**: Human‑readable activity with statuses and references.
-- **Security & Controls**: Non‑custodial architecture, audited patterns, and standard safeguards.
+- **Swap Assets**: Seamlessly exchange between Naira, USDT, and other cryptocurrencies with real-time conversion rates and minimal fees.
+- **Invest Strategically**: Choose from Conservative, Balanced, or Growth investment strategies tailored to your risk tolerance and financial goals.
+- **Stake & Earn**: Earn daily rewards by staking your USDT, USDC, or DAI in secure staking pools with competitive APY rates.
+- **Real-Time Analytics**: Track your portfolio performance with detailed analytics, charts, and insights into your investment returns.
+- **Secure & Transparent**: Your assets are protected with industry-leading security protocols and full transparency in all transactions.
+- **24/7 Support**: Access dedicated support anytime to help with your investments and answer questions.
 
 ---
 
@@ -115,11 +117,50 @@ Add assets under `frontend/public/` and reference them here.
 
 ---
 
-### Who It’s For
+## Contract Addresses (Hedera Testnet)
 
-- Individuals seeking straightforward yield across staking and vaults
-- Power users who want AMM swaps + yield in one tab
-- Teams needing clean, non‑custodial flows for treasury operations
+All contracts are deployed on **Hedera Testnet (Chain ID: 296)**.
+
+### Core Contracts
+
+| Contract         | Address                                      | Description                                               |
+| ---------------- | -------------------------------------------- | --------------------------------------------------------- |
+| **Exchange**     | `0x1938C3345f2B6B2Fa3538713DB50f80ebA3a61d5` | Main exchange contract for token swaps and HBAR transfers |
+| **VaultFactory** | `0x29021eaeb230Bc84120C0f05FDD83C446270c4f7` | Factory contract for creating and managing yield vaults   |
+| **StakingPools** | `0xE057622f9A2479f4990ffC11aeAd0De40DA7862A` | Main staking pools contract for token staking and rewards |
+
+### Token Contracts
+
+| Token    | Address                                      | Description                |
+| -------- | -------------------------------------------- | -------------------------- |
+| **USDT** | `0xd4E61131Ed9C3dd610727655aE8254B286deE95c` | Tether USD (MockERC20)     |
+| **USDC** | `0x125D3f690f281659Dd7708D21688BC83Ee534aE6` | USD Coin (MockERC20)       |
+| **DAI**  | `0x3814F5Cf6c4Aa63EdDF8A79c82346a163c7E7C53` | Dai Stablecoin (MockERC20) |
+
+### Vault Contracts
+
+| Vault          | Address                                      | Asset | Description                     |
+| -------------- | -------------------------------------------- | ----- | ------------------------------- |
+| **USDT Vault** | `0x297375e521c0b864783000279faec4583a167453` | USDT  | High Yield USDT Vault (18% APY) |
+| **USDC Vault** | `0x4f2f9b9b32cd1062c1bc4c02dd7a6b8cd9eeee8c` | USDC  | Stable USDC Vault (12% APY)     |
+| **DAI Vault**  | `0xcdeb6cd4b06c026fdd37fcac346b31dc90f6d084` | DAI   | Optimized DAI Vault (15% APY)   |
+
+### Network Information
+
+- **Network**: Hedera Testnet
+- **Chain ID**: 296
+- **RPC URL**: `https://testnet.hashio.io/api`
+- **Explorer**: https://hashscan.io/testnet
+
+---
+
+### Who It's For
+
+- **The Unbanked**: Individuals seeking easy access to cryptocurrency and DeFi services without traditional banking requirements.
+- **Nigerian Users**: People who want to send and swap Naira, buy USDT, and seamlessly bridge traditional bank rails with crypto.
+- **Yield Seekers**: Individuals seeking straightforward yield across staking pools and investment vaults.
+- **Power Users**: Traders who want AMM swaps, staking, and yield farming in one unified platform.
+- **Institutions**: Teams needing clean, auditable flows for treasury operations and digital asset management.
 
 ---
 
@@ -134,9 +175,10 @@ Add assets under `frontend/public/` and reference them here.
 
 ### Trust & Safety
 
-- Non‑custodial by default; users control private keys
-- Transparent on‑chain contracts and verifiable rewards
-- Defense‑in‑depth patterns following established best practices
+- **Security First**: Your assets are protected with industry-leading security protocols, multi-signature wallets, and regular security audits.
+- **Transparent Operations**: Full transparency in all transactions and operations. Track every swap, investment, and reward in real-time.
+- **On‑Chain Verification**: Non‑custodial by default with transparent on‑chain contracts and verifiable rewards.
+- **Democratized Access**: Sophisticated investment strategies accessible to everyone, prioritizing your peace of mind above all else.
 
 ---
 
