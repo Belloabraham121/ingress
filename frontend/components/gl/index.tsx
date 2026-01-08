@@ -72,13 +72,14 @@ export const GL = ({ hovering }: { hovering: boolean }) => {
           manualTime={manualTime}
           introspect={hovering}
         />
-        <Effects multisampling={0} disableGamma>
+        {/* Postprocessing temporarily disabled to resolve TS typings for shaderPass */}
+        {/* <Effects multisampling={0} disableGamma>
           <shaderPass
             args={[VignetteShader]}
             uniforms-darkness-value={vignetteDarkness}
             uniforms-offset-value={vignetteOffset}
           />
-        </Effects>
+        </Effects> */}
       </Canvas>
     </div>
   );
