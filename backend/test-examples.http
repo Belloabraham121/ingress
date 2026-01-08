@@ -1,0 +1,91 @@
+### Ingress Backend API Test Examples
+### Use with REST Client extension in VS Code or copy to Postman
+
+@baseUrl = http://localhost:3000
+@token = YOUR_TOKEN_HERE
+
+### Health Check
+GET {{baseUrl}}/
+Content-Type: application/json
+
+### Register New User
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "John Doe",
+  "email": "john.doe@example.com",
+  "password": "password123"
+}
+
+### Register Another User
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Jane Smith",
+  "email": "jane.smith@example.com",
+  "password": "password123"
+}
+
+### Login User
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "password": "password123"
+}
+
+### Login Another User
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "jane.smith@example.com",
+  "password": "password123"
+}
+
+### Get Current User Profile (Protected)
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### Fund Wallet (Protected)
+POST {{baseUrl}}/api/auth/fund-wallet
+Authorization: Bearer {{token}}
+
+### Test Invalid Email
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "fullName": "Test User",
+  "email": "invalid-email",
+  "password": "password123"
+}
+
+### Test Missing Fields
+POST {{baseUrl}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "test@example.com"
+}
+
+### Test Wrong Password
+POST {{baseUrl}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "password": "wrongpassword"
+}
+
+### Test No Token (Should Fail)
+GET {{baseUrl}}/api/auth/me
+
+### Test Invalid Token (Should Fail)
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer invalid.token.here
+
+
