@@ -132,15 +132,19 @@ export function useVaultDeposit() {
       setTxHash(depositResponse.transactionHash);
 
       // Wait for on-chain confirmation then refresh positions
+      // Only wait if it's an EVM transaction hash (0x-prefixed)
+      // Hedera transaction IDs are already confirmed by the backend
       try {
-        const provider = new ethers.JsonRpcProvider(
-          "https://testnet.hashio.io/api"
-        );
-        await provider.waitForTransaction(
-          depositResponse.transactionHash,
-          1,
-          90_000
-        );
+        const txHash = depositResponse.transactionHash;
+        // Check if it's an EVM hash (starts with 0x and is 66 chars)
+        if (txHash.startsWith("0x") && txHash.length === 66) {
+          const provider = new ethers.JsonRpcProvider(
+            "https://testnet.hashio.io/api"
+          );
+          await provider.waitForTransaction(txHash, 1, 90_000);
+        }
+        // If it's a Hedera transaction ID (format: 0.0.xxxxx@timestamp), skip wait
+        // Backend already confirmed the transaction before returning
       } catch {}
 
       // Dispatch events to refresh activity list and positions
