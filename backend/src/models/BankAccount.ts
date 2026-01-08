@@ -12,6 +12,7 @@ export interface IBankAccount extends Document {
   bankName: string;
   bankCode: string;
   virtualAccountId: string; // Paystack's dedicated virtual account ID
+  recipientCode?: string; // Paystack recipient code for transfers
   currency: string;
   isActive: boolean;
   balance: number; // Track total deposits
@@ -74,6 +75,10 @@ const BankAccountSchema: Schema = new Schema(
       type: String,
       required: true,
       unique: true,
+    },
+    recipientCode: {
+      type: String,
+      required: false,
     },
     currency: {
       type: String,

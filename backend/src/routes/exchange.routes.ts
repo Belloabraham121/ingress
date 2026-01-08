@@ -4,6 +4,9 @@ import {
   signDepositToken,
   signSwap,
   getExchangeBalance,
+  getExchangeRates,
+  calculateSwapOutput,
+  initiateNairaToTokenPayment,
 } from "../controllers/exchange.controller";
 import { protect as authenticate } from "../middleware/auth.middleware";
 
@@ -37,5 +40,26 @@ router.post("/sign-swap", authenticate, signSwap);
  * @access  Private
  */
 router.get("/balance", authenticate, getExchangeBalance);
+
+/**
+ * @route   GET /api/exchange/rates
+ * @desc    Get exchange rates for all tokens
+ * @access  Private
+ */
+router.get("/rates", authenticate, getExchangeRates);
+
+/**
+ * @route   POST /api/exchange/calculate
+ * @desc    Calculate expected output for a swap
+ * @access  Private
+ */
+router.post("/calculate", authenticate, calculateSwapOutput);
+
+/**
+ * @route   POST /api/exchange/initiate-payment
+ * @desc    Initiate Naira to Token/HBAR payment
+ * @access  Private
+ */
+router.post("/initiate-payment", authenticate, initiateNairaToTokenPayment);
 
 export default router;

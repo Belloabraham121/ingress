@@ -406,6 +406,123 @@ class PaystackService {
       };
     }
   }
+
+  /**
+   * Create a transfer recipient
+   */
+  async createTransferRecipient(
+    name: string,
+    accountNumber: string,
+    bankCode: string
+  ): Promise<any> {
+    try {
+      const response = await this.api.post("/transferrecipient", {
+        type: "nuban",
+        name,
+        account_number: accountNumber,
+        bank_code: bankCode,
+        currency: "NGN",
+      });
+
+      return {
+        status: true,
+        message: "Transfer recipient created successfully",
+        data: response.data.data,
+      };
+    } catch (error: any) {
+      console.error(
+        "Create transfer recipient error:",
+        error.response?.data || error.message
+      );
+      return {
+        status: false,
+        message:
+          error.response?.data?.message ||
+          "Failed to create transfer recipient",
+      };
+    }
+  }
+
+  /**
+   * Initiate a transfer (send money to bank account)
+   */
+  async initiateTransfer(
+    recipientCode: string,
+    amount: number,
+    reason: string = "Token withdrawal"
+  ): Promise<any> {
+    try {
+      const response = await this.api.post("/transfer", {
+        source: "balance",
+        reason,
+        amount, // Amount in kobo
+        recipient: recipientCode,
+      });
+
+      return {
+        status: true,
+        message: "Transfer initiated successfully",
+        data: response.data.data,
+      };
+    } catch (error: any) {
+      console.error(
+        "Initiate transfer error:",
+        error.response?.data || error.message
+      );
+      return {
+        status: false,
+        message: error.response?.data?.message || "Failed to initiate transfer",
+      };
+    }
+  }
+
+  /**
+   * Verify a transfer
+   */
+  async verifyTransfer(transferCode: string): Promise<any> {
+    try {
+      const response = await this.api.get(`/transfer/verify/${transferCode}`);
+
+      return {
+        status: true,
+        message: "Transfer verified successfully",
+        data: response.data.data,
+      };
+    } catch (error: any) {
+      console.error(
+        "Verify transfer error:",
+        error.response?.data || error.message
+      );
+      return {
+        status: false,
+        message: error.response?.data?.message || "Failed to verify transfer",
+      };
+    }
+  }
+
+  /**
+   * Get PayStack balance
+   */
+  async getBalance(): Promise<any> {
+    try {
+      const response = await this.api.get("/balance");
+
+      return {
+        status: true,
+        message: "Balance retrieved successfully",
+        data: response.data.data,
+      };
+    } catch (error: any) {
+      console.error(
+        "Get balance error:",
+        error.response?.data || error.message
+      );
+      return {
+        status: false,
+        message: error.response?.data?.message || "Failed to get balance",
+      };
+    }
+  }
 }
 
 export const paystackService = new PaystackService();
