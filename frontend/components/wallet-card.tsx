@@ -5,21 +5,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBankAccount } from "@/hooks/useBankAccount";
 import { Button } from "@/components/ui/button";
 import { HbarTransferConfirmationModal } from "@/components/hbar-transfer-confirmation-modal";
+import { getAllTokenBalances } from "@/lib/hedera-utils";
 
 interface Asset {
   name: string;
   symbol: string;
   amount: number;
   value: number;
+  address?: string;
 }
-
-const assets: Asset[] = [
-  { name: "Tether", symbol: "USDT", amount: 5000, value: 5000 },
-  { name: "USD Coin", symbol: "USDC", amount: 3200, value: 3200 },
-  { name: "Ethereum", symbol: "ETH", amount: 2.5, value: 4250 },
-  { name: "Bitcoin", symbol: "BTC", amount: 0.15, value: 6750 },
-  { name: "Polygon", symbol: "MATIC", amount: 1500, value: 1250 },
-];
 
 export function WalletCard() {
   const { getProfile, sendHbar, transferHbar, getWalletBalance } = useAuth();
@@ -38,6 +32,8 @@ export function WalletCard() {
   const [actionSuccess, setActionSuccess] = useState("");
   const [showConfirmationModal, setShowConfirmationModal] = useState(false);
   const [currentUserAccountId, setCurrentUserAccountId] = useState<string>("");
+  const [assets, setAssets] = useState<Asset[]>([]);
+  const [assetsLoading, setAssetsLoading] = useState(false);
 
   useEffect(() => {
     loadBalances();
@@ -52,7 +48,8 @@ export function WalletCard() {
       // Load wallet balance from profile
       const profile = await getProfile();
       setWalletBalance(profile.wallet.balance || 0);
-      setCurrentUserAccountId(profile.wallet.accountId || "");
+      const accountId = profile.wallet.accountId || "";
+      setCurrentUserAccountId(accountId);
 
       // Load bank account balance
       try {
@@ -63,10 +60,26 @@ export function WalletCard() {
         console.log("No bank account found, setting balance to 0");
         setNairaBalance(0);
       }
+
+      // Load token balances
+      if (accountId) {
+        setAssetsLoading(true);
+        try {
+          const tokenBalances = await getAllTokenBalances(accountId);
+          setAssets(tokenBalances);
+        } catch (err) {
+          console.error("Failed to load token balances:", err);
+          // Set empty array if loading fails
+          setAssets([]);
+        } finally {
+          setAssetsLoading(false);
+        }
+      }
     } catch (err) {
       console.error("Failed to load balances:", err);
       setWalletBalance(0);
       setNairaBalance(0);
+      setAssets([]);
     } finally {
       setIsLoading(false);
     }
@@ -139,7 +152,8 @@ export function WalletCard() {
     }
   };
 
-  const totalBalance = 20450.5; // This should be calculated from actual assets
+  // Calculate total balance from actual token balances
+  const totalBalance = assets.reduce((sum, asset) => sum + asset.value, 0);
 
   return (
     <div className="space-y-4">
@@ -319,66 +333,81 @@ export function WalletCard() {
         <div className="border border-border bg-background p-6 animate-in fade-in duration-300">
           <h3 className="text-lg font-sentient mb-6">ASSET BREAKDOWN</h3>
 
-          {/* Table Header */}
-          <div className="grid grid-cols-4 gap-4 mb-4 pb-4 border-b border-border/50">
-            <div className="text-xs font-mono text-foreground/60">ASSET</div>
-            <div className="text-xs font-mono text-foreground/60">SYMBOL</div>
-            <div className="text-xs font-mono text-foreground/60 text-right">
-              AMOUNT
+          {assetsLoading ? (
+            <div className="text-center py-8">
+              <p className="text-sm font-mono text-foreground/60">
+                Loading token balances...
+              </p>
             </div>
-            <div className="text-xs font-mono text-foreground/60 text-right">
-              VALUE (USD)
-            </div>
-          </div>
-
-          {/* Table Rows */}
-          <div className="space-y-3">
-            {[
-              { name: "Tether", symbol: "USDT", amount: 5000, value: 5000 },
-              { name: "USD Coin", symbol: "USDC", amount: 3200, value: 3200 },
-              { name: "Ethereum", symbol: "ETH", amount: 2.5, value: 4250 },
-              { name: "Bitcoin", symbol: "BTC", amount: 0.15, value: 6750 },
-              { name: "Polygon", symbol: "MATIC", amount: 1500, value: 1250 },
-            ].map((asset, idx) => (
-              <div
-                key={idx}
-                className="grid grid-cols-4 gap-4 py-3 border-b border-border/30 last:border-0"
-              >
-                <div className="text-sm font-mono text-foreground">
-                  {asset.name}
+          ) : (
+            <>
+              {/* Table Header */}
+              <div className="grid grid-cols-4 gap-4 mb-4 pb-4 border-b border-border/50">
+                <div className="text-xs font-mono text-foreground/60">
+                  ASSET
                 </div>
-                <div className="text-sm font-mono text-primary font-medium">
-                  {asset.symbol}
+                <div className="text-xs font-mono text-foreground/60">
+                  SYMBOL
                 </div>
-                <div className="text-sm font-mono text-foreground text-right">
-                  {asset.amount.toLocaleString(undefined, {
-                    maximumFractionDigits: 2,
-                  })}
+                <div className="text-xs font-mono text-foreground/60 text-right">
+                  AMOUNT
                 </div>
-                <div className="text-sm font-mono text-foreground text-right">
-                  $
-                  {asset.value.toLocaleString(undefined, {
-                    maximumFractionDigits: 2,
-                  })}
+                <div className="text-xs font-mono text-foreground/60 text-right">
+                  VALUE (USD)
                 </div>
               </div>
-            ))}
-          </div>
 
-          {/* Total Row */}
-          <div className="grid grid-cols-4 gap-4 mt-6 pt-4 border-t border-border">
-            <div className="text-sm font-mono font-medium text-foreground">
-              TOTAL
-            </div>
-            <div></div>
-            <div></div>
-            <div className="text-sm font-mono font-medium text-primary text-right">
-              $
-              {[5000, 3200, 4250, 6750, 1250]
-                .reduce((sum, val) => sum + val, 0)
-                .toLocaleString()}
-            </div>
-          </div>
+              {/* Table Rows */}
+              <div className="space-y-3">
+                {assets.length > 0 ? (
+                  assets.map((asset, idx) => (
+                    <div
+                      key={idx}
+                      className="grid grid-cols-4 gap-4 py-3 border-b border-border/30 last:border-0"
+                    >
+                      <div className="text-sm font-mono text-foreground">
+                        {asset.name}
+                      </div>
+                      <div className="text-sm font-mono text-primary font-medium">
+                        {asset.symbol}
+                      </div>
+                      <div className="text-sm font-mono text-foreground text-right">
+                        {asset.amount.toLocaleString(undefined, {
+                          maximumFractionDigits: 2,
+                        })}
+                      </div>
+                      <div className="text-sm font-mono text-foreground text-right">
+                        $
+                        {asset.value.toLocaleString(undefined, {
+                          maximumFractionDigits: 2,
+                        })}
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8">
+                    <p className="text-sm font-mono text-foreground/60">
+                      No token balances found
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Total Row */}
+              {assets.length > 0 && (
+                <div className="grid grid-cols-4 gap-4 mt-6 pt-4 border-t border-border">
+                  <div className="text-sm font-mono font-medium text-foreground">
+                    TOTAL
+                  </div>
+                  <div></div>
+                  <div></div>
+                  <div className="text-sm font-mono font-medium text-primary text-right">
+                    ${totalBalance.toLocaleString()}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
         </div>
       )}
 

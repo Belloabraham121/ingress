@@ -7,6 +7,8 @@ import authRoutes from "./routes/auth.routes";
 import bankAccountRoutes from "./routes/bankAccount.routes";
 import webhookRoutes from "./routes/webhook.routes";
 import paymentRoutes from "./routes/payment.routes";
+import vaultRoutes from "./routes/vault.routes";
+import stakingRoutes from "./routes/staking.routes";
 
 const app: Application = express();
 
@@ -29,6 +31,8 @@ app.use("/api/auth", authRoutes);
 app.use("/api/bank-account", bankAccountRoutes);
 app.use("/api/webhook", webhookRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/vault", vaultRoutes);
+app.use("/api/staking", stakingRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: any) => {

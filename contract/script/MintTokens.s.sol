@@ -14,14 +14,17 @@ import "../test/MockERC20.sol";
  */
 contract MintTokens is Script {
     // Token addresses (if already deployed)
-    address constant USDT = 0xaaa4e4EdA96fb9A9eBA3A10cC4d274c63846C81d;
-    
+    address constant DAI = 0x3814F5Cf6c4Aa63EdDF8A79c82346a163c7E7C53;
+    address constant USDC = 0x125D3f690f281659Dd7708D21688BC83Ee534aE6;
+    address constant USDT = 0xd4E61131Ed9C3dd610727655aE8254B286deE95c;
+
     // Amount to mint per token (1 million tokens)
-    uint256 constant MINT_AMOUNT = 1_000_000 * 1e18;
+    uint256 constant MINT_AMOUNT = 1_000 * 1e18;
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
+        address user = 0x00000000000000000000000000000000006D184c;
 
         console.log("=================================================");
         console.log("MINTING TOKENS");
@@ -33,7 +36,7 @@ contract MintTokens is Script {
         vm.startBroadcast(deployerPrivateKey);
 
         // Try to mint USDT
-        try MockERC20(USDT).mint(deployer, MINT_AMOUNT) {
+        try MockERC20(USDC).mint(user, MINT_AMOUNT) {
             console.log("Minted", MINT_AMOUNT / 1e18, "USDT to", deployer);
         } catch {
             console.log("Failed to mint USDT - you may not be the owner");
@@ -47,4 +50,3 @@ contract MintTokens is Script {
         console.log("=================================================");
     }
 }
-
