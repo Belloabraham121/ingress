@@ -10,6 +10,7 @@ import paymentRoutes from "./routes/payment.routes";
 import vaultRoutes from "./routes/vault.routes";
 import stakingRoutes from "./routes/staking.routes";
 import activityRoutes from "./routes/activity.routes";
+import walletRoutes from "./routes/wallet.routes";
 import exchangeRoutes from "./routes/exchange.routes";
 
 const app: Application = express();
@@ -37,6 +38,7 @@ app.use("/api/vault", vaultRoutes);
 app.use("/api/staking", stakingRoutes);
 app.use("/api/activity", activityRoutes);
 app.use("/api/exchange", exchangeRoutes);
+app.use("/api/wallet", walletRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response, next: any) => {

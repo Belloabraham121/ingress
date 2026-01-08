@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useResolveRecipient } from "@/hooks/useResolveRecipient";
 import { getToken } from "@/lib/api";
 import { SuccessModal } from "@/components/success-modal";
 
@@ -20,6 +21,7 @@ export function TokenTransferModal({
   const [submitting, setSubmitting] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
   const [txId, setTxId] = useState<string | undefined>(undefined);
+  const { result, loading: resolving, error } = useResolveRecipient(recipient);
   const API_URL =
     process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api";
 
@@ -81,6 +83,24 @@ export function TokenTransferModal({
               value={recipient}
               onChange={(e) => setRecipient(e.target.value)}
             />
+            {recipient && result && (
+              <div className="mt-1 border border-border bg-background text-foreground font-mono text-xs p-2">
+                <div className="flex items-center justify-between">
+                  <span>{result.name || "Unknown user"}</span>
+                  <span className="text-foreground/60">{result.accountId}</span>
+                </div>
+              </div>
+            )}
+            {recipient && !result && resolving && (
+              <div className="mt-1 border border-border bg-background text-foreground/60 font-mono text-xs p-2">
+                Resolving recipient…
+              </div>
+            )}
+            {recipient && error && (
+              <div className="mt-1 border border-border bg-background text-red-500 font-mono text-xs p-2">
+                {error}
+              </div>
+            )}
           </div>
           <div>
             <label className="text-xs font-mono text-foreground/60">

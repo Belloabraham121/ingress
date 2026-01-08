@@ -5,6 +5,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useBankAccount } from "@/hooks/useBankAccount";
 import { Button } from "@/components/ui/button";
 import { HbarTransferConfirmationModal } from "@/components/hbar-transfer-confirmation-modal";
+import { useResolveRecipient } from "@/hooks/useResolveRecipient";
 import { NairaTransferModal } from "@/components/naira-transfer-modal";
 import { TokenTransferModal } from "./token-transfer-modal";
 import { getAllTokenBalances } from "@/lib/hedera-utils";
@@ -39,6 +40,11 @@ export function WalletCard() {
   const [currentUserAccountId, setCurrentUserAccountId] = useState<string>("");
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetsLoading, setAssetsLoading] = useState(false);
+  const {
+    result: resolved,
+    loading: resolving,
+    error: resolveError,
+  } = useResolveRecipient(recipientAccountId);
 
   useEffect(() => {
     loadBalances();
@@ -273,6 +279,26 @@ export function WalletCard() {
                 placeholder="Recipient Account ID (e.g., 0.0.67890)"
                 className="w-full px-3 py-2 bg-background border border-border text-foreground placeholder-foreground/40 font-mono text-sm focus:outline-none focus:border-primary transition-colors"
               />
+              {recipientAccountId && resolved && (
+                <div className="mt-1 border border-border bg-background text-foreground font-mono text-xs p-2">
+                  <div className="flex items-center justify-between">
+                    <span>{resolved.name || "Unknown user"}</span>
+                    <span className="text-foreground/60">
+                      {resolved.accountId}
+                    </span>
+                  </div>
+                </div>
+              )}
+              {recipientAccountId && !resolved && resolving && (
+                <div className="mt-1 border border-border bg-background text-foreground/60 font-mono text-xs p-2">
+                  Resolving recipient…
+                </div>
+              )}
+              {recipientAccountId && resolveError && (
+                <div className="mt-1 border border-border bg-background text-red-500 font-mono text-xs p-2">
+                  {resolveError}
+                </div>
+              )}
               <input
                 type="number"
                 value={transferAmount}
