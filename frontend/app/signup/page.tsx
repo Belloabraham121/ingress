@@ -85,7 +85,7 @@ export default function SignUp() {
                   Create Account
                 </h1>
                 <p className="font-mono text-sm text-foreground/60">
-                  Join Skal Ventures and start investing
+                  Join Ingress and start investing
                 </p>
               </div>
 
