@@ -216,6 +216,19 @@ async function handleChargeSuccess(data: any): Promise<void> {
 
       if (exchangeType === "naira_to_token" && tokenAddress) {
         // Naira → Token
+        // Deduct Naira amount from balance BEFORE processing swap
+        // (The payment was made externally via PayStack, so we need to reflect it in our DB)
+        const oldBalance = bankAccount.balance || 0;
+        bankAccount.balance = Math.max(0, oldBalance - nairaAmount);
+        await bankAccount.save();
+        console.log(
+          `💰 NGN balance deducted for swap: ₦${oldBalance.toFixed(
+            2
+          )} → ₦${bankAccount.balance.toFixed(
+            2
+          )} (deducted ₦${nairaAmount.toFixed(2)})`
+        );
+
         const result = await exchangeService.handleNairaToToken(
           walletAddress,
           bankAccount.userId.toString(),
@@ -231,6 +244,18 @@ async function handleChargeSuccess(data: any): Promise<void> {
         }
       } else if (exchangeType === "naira_to_hbar") {
         // Naira → HBAR
+        // Deduct Naira amount from balance BEFORE processing swap
+        const oldBalance = bankAccount.balance || 0;
+        bankAccount.balance = Math.max(0, oldBalance - nairaAmount);
+        await bankAccount.save();
+        console.log(
+          `💰 NGN balance deducted for swap: ₦${oldBalance.toFixed(
+            2
+          )} → ₦${bankAccount.balance.toFixed(
+            2
+          )} (deducted ₦${nairaAmount.toFixed(2)})`
+        );
+
         const result = await exchangeService.handleNairaToHbar(
           walletAddress,
           bankAccount.userId.toString(),
