@@ -51,35 +51,41 @@ class PriceOracleService {
    * Get HBAR/USD rate from Hedera Mirror Node
    */
   async getHbarUsdRate(): Promise<number> {
-    try {
-      const mirrorNode = this.isTestnet
-        ? HEDERA_TESTNET_MIRROR
-        : HEDERA_MAINNET_MIRROR;
+    // try {
+    //   const mirrorNode = this.isTestnet
+    //     ? HEDERA_TESTNET_MIRROR
+    //     : HEDERA_MAINNET_MIRROR;
 
-      const response = await axios.get<HbarExchangeRate>(
-        `${mirrorNode}/network/exchangerate`
-      );
+    //   const response = await axios.get<HbarExchangeRate>(
+    //     `${mirrorNode}/network/exchangerate`
+    //   );
 
-      const { cent_equivalent, hbar_equivalent } = response.data.current_rate;
+    //   const { cent_equivalent, hbar_equivalent } = response.data.current_rate;
 
-      // Calculate USD per HBAR
-      // 1 HBAR = (cent_equivalent / hbar_equivalent) cents
-      const centsPerHbar = cent_equivalent / hbar_equivalent;
-      const usdPerHbar = centsPerHbar / 100; // Convert cents to dollars
+    //   // Calculate USD per HBAR
+    //   // 1 HBAR = (cent_equivalent / hbar_equivalent) cents
+    //   const centsPerHbar = cent_equivalent / hbar_equivalent;
+    //   const usdPerHbar = centsPerHbar / 100; // Convert cents to dollars
 
-      console.log(`📊 HBAR/USD Rate: $${usdPerHbar.toFixed(4)}`);
-      console.log(
-        `   Source: Hedera Mirror Node (${
-          this.isTestnet ? "Testnet" : "Mainnet"
-        })`
-      );
+    //   console.log(`📊 HBAR/USD Rate: $${usdPerHbar.toFixed(4)}`);
+    //   console.log(
+    //     `   Source: Hedera Mirror Node (${
+    //       this.isTestnet ? "Testnet" : "Mainnet"
+    //     })`
+    //   );
 
-      return usdPerHbar;
-    } catch (error) {
-      console.error("Error fetching HBAR/USD rate from mirror node:", error);
-      // Return fallback rate (approximately $0.06)
-      return 0.06;
-    }
+    //   return usdPerHbar;
+    // } catch (error) {
+    //   console.error("Error fetching HBAR/USD rate from mirror node:", error);
+    //   // Return fallback rate (approximately $0.06)
+    //   return 0.06;
+    // }
+
+    // Using fixed ETH price for MNT
+    const mntUsdPrice = 3381;
+    console.log(`📊 MNT/USD Rate: $${mntUsdPrice}`);
+    console.log("   Source: Fixed ETH price");
+    return mntUsdPrice;
   }
 
   /**
