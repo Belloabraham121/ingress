@@ -6,7 +6,7 @@ Ingress is the all‑in‑one money app for the unbanked. Send and swap Naira, b
 
 - **All‑in‑one Platform**: Swap assets, stake for rewards, and invest in yield strategies—all in one place.
 - **Bridging Traditional and Crypto Finance**: Send and swap Naira, buy USDT, and seamlessly bridge bank rails with blockchain.
-- **Fast and Low‑Cost**: Built with performance and low fees in mind on Hedera Hashgraph.
+- **Fast and Low‑Cost**: Built with performance and low fees in mind on Mantle blockchain.
 - **Trust‑by‑Design**: On‑chain smart contracts, verifiable rewards, and transparent accounting.
 - **Democratized Access**: Sophisticated investment strategies accessible to everyone, from beginners to experienced traders.
 
@@ -98,60 +98,6 @@ flowchart LR
 - **Smart Contracts**: Solidity contracts for Exchange (AMM), StakingPools, VaultFactory, and RewardVault.
 - **Data**: Backend persistence for user sessions, metadata, and indexing.
 
-Repository highlights:
-
-- `frontend/` — App routes, components, hooks, and chain utils
-- `backend/` — API, controllers, services, and configuration
-- `contract/` — Solidity sources, deployments, and scripts
-
----
-
-### Screenshots (Placeholders)
-
-- Dashboard: portfolio, balances, recent activity
-- Swap: input/output, price impact, slippage
-- Staking: pool cards, APRs, rewards, claim
-- Vaults: deposit/withdraw, performance, allocations
-
-Add assets under `frontend/public/` and reference them here.
-
----
-
-## Contract Addresses (Hedera Testnet)
-
-All contracts are deployed on **Hedera Testnet (Chain ID: 296)**.
-
-### Core Contracts
-
-| Contract         | Address                                      | Description                                               |
-| ---------------- | -------------------------------------------- | --------------------------------------------------------- |
-| **Exchange**     | `0x1938C3345f2B6B2Fa3538713DB50f80ebA3a61d5` | Main exchange contract for token swaps and HBAR transfers |
-| **VaultFactory** | `0x29021eaeb230Bc84120C0f05FDD83C446270c4f7` | Factory contract for creating and managing yield vaults   |
-| **StakingPools** | `0xE057622f9A2479f4990ffC11aeAd0De40DA7862A` | Main staking pools contract for token staking and rewards |
-
-### Token Contracts
-
-| Token    | Address                                      | Description                |
-| -------- | -------------------------------------------- | -------------------------- |
-| **USDT** | `0xd4E61131Ed9C3dd610727655aE8254B286deE95c` | Tether USD (MockERC20)     |
-| **USDC** | `0x125D3f690f281659Dd7708D21688BC83Ee534aE6` | USD Coin (MockERC20)       |
-| **DAI**  | `0x3814F5Cf6c4Aa63EdDF8A79c82346a163c7E7C53` | Dai Stablecoin (MockERC20) |
-
-### Vault Contracts
-
-| Vault          | Address                                      | Asset | Description                     |
-| -------------- | -------------------------------------------- | ----- | ------------------------------- |
-| **USDT Vault** | `0x297375e521c0b864783000279faec4583a167453` | USDT  | High Yield USDT Vault (18% APY) |
-| **USDC Vault** | `0x4f2f9b9b32cd1062c1bc4c02dd7a6b8cd9eeee8c` | USDC  | Stable USDC Vault (12% APY)     |
-| **DAI Vault**  | `0xcdeb6cd4b06c026fdd37fcac346b31dc90f6d084` | DAI   | Optimized DAI Vault (15% APY)   |
-
-### Network Information
-
-- **Network**: Hedera Testnet
-- **Chain ID**: 296
-- **RPC URL**: `https://testnet.hashio.io/api`
-- **Explorer**: https://hashscan.io/testnet
-
 ---
 
 ### Who It's For
@@ -161,45 +107,6 @@ All contracts are deployed on **Hedera Testnet (Chain ID: 296)**.
 - **Yield Seekers**: Individuals seeking straightforward yield across staking pools and investment vaults.
 - **Power Users**: Traders who want AMM swaps, staking, and yield farming in one unified platform.
 - **Institutions**: Teams needing clean, auditable flows for treasury operations and digital asset management.
-
----
-
-### Roadmap (Excerpt)
-
-- Wallet extensions and mobile‑first improvements
-- Additional vault strategies and risk labels
-- Advanced analytics: PnL, tax lots, and export
-- Governance hooks and programmatic access keys
-
----
-
-### Trust & Safety
-
-- **Security First**: Your assets are protected with industry-leading security protocols, multi-signature wallets, and regular security audits.
-- **Transparent Operations**: Full transparency in all transactions and operations. Track every swap, investment, and reward in real-time.
-- **On‑Chain Verification**: Non‑custodial by default with transparent on‑chain contracts and verifiable rewards.
-- **Democratized Access**: Sophisticated investment strategies accessible to everyone, prioritizing your peace of mind above all else.
-
----
-
-### For Developers (Brief)
-
-- Frontend: Next.js app in `frontend/`
-- Backend: Node/Express in `backend/`
-- Contracts: Solidity in `contract/`
-
-See folders above for code and deployment artifacts. This README focuses on the product story; engineering details live alongside the code.
-
----
-
-### Testing
-
-For testing the application, use the following test credentials:
-
-- **Email**: `test@gmail.com`
-- **Password**: `12345678`
-
----
 
 ### License
 
