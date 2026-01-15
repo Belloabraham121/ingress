@@ -81,6 +81,7 @@ export function RecentActivityCard({
     if (!token) return "tokens";
     const t = token.trim();
     if (t.toUpperCase() === "NGN") return "NGN";
+    if (t.toUpperCase() === "HBAR") return "MNT"; // Display HBAR as MNT
     if (t.toUpperCase() === "MNT") return "MNT";
     if (t.startsWith("0x")) {
       return addressToSymbol[t.toLowerCase()] || t;

@@ -47,6 +47,11 @@ const trimTrailingZeros = (val: string): string => {
   return val.replace(/\.0+$|(?<=\.[0-9]*?)0+$/g, "").replace(/\.$/, "");
 };
 
+// Map frontend symbol to backend symbol (MNT displays as MNT but backend expects HBAR)
+const toBackendSymbol = (symbol: string): string => {
+  return symbol === "MNT" ? "HBAR" : symbol;
+};
+
 export function SwapCard() {
   const [fromAmount, setFromAmount] = useState("");
   const [toAmount, setToAmount] = useState("");
@@ -89,8 +94,8 @@ export function SwapCard() {
     setUsingFallbackRates(false);
 
     try {
-      const fromAddress = fromToken.address || fromToken.symbol;
-      const toAddress = toToken.address || toToken.symbol;
+      const fromAddress = fromToken.address || toBackendSymbol(fromToken.symbol);
+      const toAddress = toToken.address || toBackendSymbol(toToken.symbol);
 
       const result = await calculateSwap(
         fromAddress,
