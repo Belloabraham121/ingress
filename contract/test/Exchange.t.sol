@@ -6,8 +6,8 @@ import "../src/Exchange.sol";
 import "./MockERC20.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract TestVaultTest is Test {
-    TestVault public vault;
+contract ExchangeTest is Test {
+    Exchange public vault;
     MockERC20 public token;
 
     address public owner = address(0x1);
@@ -44,7 +44,7 @@ contract TestVaultTest is Test {
 
     function setUp() public {
         vm.startPrank(owner);
-        vault = new TestVault(authorizedWithdrawer);
+        vault = new Exchange(authorizedWithdrawer);
         token = new MockERC20("Test Token", "TEST", 18, 0);
         vm.stopPrank();
 
@@ -61,9 +61,9 @@ contract TestVaultTest is Test {
     }
 
     function testConstructorWithZeroAddress() public {
-        vm.expectRevert(TestVault.InvalidAddress.selector);
+        vm.expectRevert(Exchange.InvalidAddress.selector);
         vm.prank(owner);
-        new TestVault(address(0));
+        new Exchange(address(0));
     }
 
     function testDepositToken() public {
@@ -86,14 +86,14 @@ contract TestVaultTest is Test {
 
     function testDepositTokenWithZeroAddress() public {
         vm.startPrank(user1);
-        vm.expectRevert(TestVault.InvalidToken.selector);
+        vm.expectRevert(Exchange.InvalidToken.selector);
         vault.depositToken(address(0), DEPOSIT_AMOUNT);
         vm.stopPrank();
     }
 
     function testDepositTokenWithZeroAmount() public {
         vm.startPrank(user1);
-        vm.expectRevert(TestVault.InvalidAmount.selector);
+        vm.expectRevert(Exchange.InvalidAmount.selector);
         vault.depositToken(address(token), 0);
         vm.stopPrank();
     }
@@ -114,7 +114,7 @@ contract TestVaultTest is Test {
 
     function testDepositHbarWithZeroAmount() public {
         vm.startPrank(user1);
-        vm.expectRevert(TestVault.InvalidAmount.selector);
+        vm.expectRevert(Exchange.InvalidAmount.selector);
         vault.depositHbar{value: 0}();
         vm.stopPrank();
     }
@@ -163,14 +163,14 @@ contract TestVaultTest is Test {
         token.approve(address(vault), DEPOSIT_AMOUNT);
         vault.depositToken(address(token), DEPOSIT_AMOUNT);
 
-        vm.expectRevert(TestVault.UnauthorizedWithdrawal.selector);
+        vm.expectRevert(Exchange.UnauthorizedWithdrawal.selector);
         vault.withdrawToken(address(token), recipient, DEPOSIT_AMOUNT);
         vm.stopPrank();
     }
 
     function testWithdrawTokenInsufficientBalance() public {
         vm.startPrank(authorizedWithdrawer);
-        vm.expectRevert(TestVault.InsufficientBalance.selector);
+        vm.expectRevert(Exchange.InsufficientBalance.selector);
         vault.withdrawToken(address(token), recipient, DEPOSIT_AMOUNT);
         vm.stopPrank();
     }
@@ -179,15 +179,15 @@ contract TestVaultTest is Test {
         vm.startPrank(authorizedWithdrawer);
 
         // Invalid token address
-        vm.expectRevert(TestVault.InvalidToken.selector);
+        vm.expectRevert(Exchange.InvalidToken.selector);
         vault.withdrawToken(address(0), recipient, DEPOSIT_AMOUNT);
 
         // Invalid recipient address
-        vm.expectRevert(TestVault.InvalidAddress.selector);
+        vm.expectRevert(Exchange.InvalidAddress.selector);
         vault.withdrawToken(address(token), address(0), DEPOSIT_AMOUNT);
 
         // Invalid amount
-        vm.expectRevert(TestVault.InvalidAmount.selector);
+        vm.expectRevert(Exchange.InvalidAmount.selector);
         vault.withdrawToken(address(token), recipient, 0);
 
         vm.stopPrank();
@@ -218,14 +218,14 @@ contract TestVaultTest is Test {
         vm.startPrank(user1);
         vault.depositHbar{value: HBAR_DEPOSIT}();
 
-        vm.expectRevert(TestVault.UnauthorizedWithdrawal.selector);
+        vm.expectRevert(Exchange.UnauthorizedWithdrawal.selector);
         vault.withdrawHbar(payable(recipient), HBAR_DEPOSIT);
         vm.stopPrank();
     }
 
     function testWithdrawHbarInsufficientBalance() public {
         vm.startPrank(authorizedWithdrawer);
-        vm.expectRevert(TestVault.InsufficientBalance.selector);
+        vm.expectRevert(Exchange.InsufficientBalance.selector);
         vault.withdrawHbar(payable(recipient), HBAR_DEPOSIT);
         vm.stopPrank();
     }
@@ -234,11 +234,11 @@ contract TestVaultTest is Test {
         vm.startPrank(authorizedWithdrawer);
 
         // Invalid recipient address
-        vm.expectRevert(TestVault.InvalidAddress.selector);
+        vm.expectRevert(Exchange.InvalidAddress.selector);
         vault.withdrawHbar(payable(address(0)), HBAR_DEPOSIT);
 
         // Invalid amount
-        vm.expectRevert(TestVault.InvalidAmount.selector);
+        vm.expectRevert(Exchange.InvalidAmount.selector);
         vault.withdrawHbar(payable(recipient), 0);
 
         vm.stopPrank();
@@ -272,7 +272,7 @@ contract TestVaultTest is Test {
 
     function testUpdateAuthorizedWithdrawerInvalidAddress() public {
         vm.startPrank(owner);
-        vm.expectRevert(TestVault.InvalidAddress.selector);
+        vm.expectRevert(Exchange.InvalidAddress.selector);
         vault.updateAuthorizedWithdrawer(address(0));
         vm.stopPrank();
     }
@@ -356,7 +356,7 @@ contract TestVaultTest is Test {
 
     function testEmergencyRecoverHbarInsufficientBalance() public {
         vm.startPrank(owner);
-        vm.expectRevert(TestVault.InsufficientBalance.selector);
+        vm.expectRevert(Exchange.InsufficientBalance.selector);
         vault.emergencyRecoverHbar(HBAR_DEPOSIT);
         vm.stopPrank();
     }
@@ -454,7 +454,7 @@ contract TestVaultTest is Test {
         token.approve(address(vault), DEPOSIT_AMOUNT);
         vault.depositToken(address(token), DEPOSIT_AMOUNT);
 
-        vm.expectRevert(TestVault.UnauthorizedWithdrawal.selector);
+        vm.expectRevert(Exchange.UnauthorizedWithdrawal.selector);
         vault.transferToUser(address(token), recipient, DEPOSIT_AMOUNT);
         vm.stopPrank();
     }
@@ -463,15 +463,15 @@ contract TestVaultTest is Test {
         vm.startPrank(authorizedWithdrawer);
 
         // Invalid token address
-        vm.expectRevert(TestVault.InvalidToken.selector);
+        vm.expectRevert(Exchange.InvalidToken.selector);
         vault.transferToUser(address(0), recipient, DEPOSIT_AMOUNT);
 
         // Invalid recipient address
-        vm.expectRevert(TestVault.InvalidAddress.selector);
+        vm.expectRevert(Exchange.InvalidAddress.selector);
         vault.transferToUser(address(token), address(0), DEPOSIT_AMOUNT);
 
         // Invalid amount
-        vm.expectRevert(TestVault.InvalidAmount.selector);
+        vm.expectRevert(Exchange.InvalidAmount.selector);
         vault.transferToUser(address(token), recipient, 0);
 
         vm.stopPrank();
@@ -479,7 +479,7 @@ contract TestVaultTest is Test {
 
     function testTransferToUserInsufficientBalance() public {
         vm.startPrank(authorizedWithdrawer);
-        vm.expectRevert(TestVault.InsufficientBalance.selector);
+        vm.expectRevert(Exchange.InsufficientBalance.selector);
         vault.transferToUser(address(token), recipient, DEPOSIT_AMOUNT);
         vm.stopPrank();
     }
@@ -528,7 +528,7 @@ contract TestVaultTest is Test {
         vm.startPrank(user1);
         vault.depositHbar{value: HBAR_DEPOSIT}();
 
-        vm.expectRevert(TestVault.UnauthorizedWithdrawal.selector);
+        vm.expectRevert(Exchange.UnauthorizedWithdrawal.selector);
         vault.transferHbarToUser(payable(recipient), HBAR_DEPOSIT);
         vm.stopPrank();
     }
@@ -537,11 +537,11 @@ contract TestVaultTest is Test {
         vm.startPrank(authorizedWithdrawer);
 
         // Invalid recipient address
-        vm.expectRevert(TestVault.InvalidAddress.selector);
+        vm.expectRevert(Exchange.InvalidAddress.selector);
         vault.transferHbarToUser(payable(address(0)), HBAR_DEPOSIT);
 
         // Invalid amount
-        vm.expectRevert(TestVault.InvalidAmount.selector);
+        vm.expectRevert(Exchange.InvalidAmount.selector);
         vault.transferHbarToUser(payable(recipient), 0);
 
         vm.stopPrank();
@@ -549,7 +549,7 @@ contract TestVaultTest is Test {
 
     function testTransferHbarToUserInsufficientBalance() public {
         vm.startPrank(authorizedWithdrawer);
-        vm.expectRevert(TestVault.InsufficientBalance.selector);
+        vm.expectRevert(Exchange.InsufficientBalance.selector);
         vault.transferHbarToUser(payable(recipient), HBAR_DEPOSIT);
         vm.stopPrank();
     }

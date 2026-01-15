@@ -10,16 +10,17 @@ optimizer = true
 optimizer_runs = 200
 
 [rpc_endpoints]
-# Hedera Testnet
-hedera_testnet = "https://testnet.hashio.io/api"
+# Mantle Sepolia Testnet
+mantle_sepolia = "https://mantle-sepolia.g.alchemy.com/v2/cpenwKf_vUc59UKfsx5FUumCtZ_bSU_W"
 testnet = "${RPC_URL}"
 
-# Hedera Mainnet
-hedera_mainnet = "https://mainnet.hashio.io/api"
-mainnet = "https://mainnet.hashio.io/api"
+# Mantle Mainnet
+mantle_mainnet = "https://rpc.mantle.xyz"
+mainnet = "https://rpc.mantle.xyz"
 
 [etherscan]
-# Hedera doesn't use Etherscan, but we can configure for other networks if needed
-# hedera_testnet = { key = "${HEDERA_API_KEY}", url = "https://hashscan.io/testnet" }
+# Mantle block explorer
+mantle_sepolia = { key = "${ETHERSCAN_API_KEY}", url = "https://sepolia.mantlescan.xyz/api" }
+mantle_mainnet = { key = "${ETHERSCAN_API_KEY}", url = "https://mantlescan.xyz/api" }
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
