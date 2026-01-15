@@ -138,7 +138,7 @@ export function WalletCard() {
 
     if (!recipientAccountId || !recipientAccountId.match(/^0\.0\.\d+$/)) {
       setActionError(
-        "Please enter a valid Hedera Account ID (e.g., 0.0.12345)"
+        "Please enter a valid EVM Account ID (e.g., 0.0.12345)"
       );
       return;
     }

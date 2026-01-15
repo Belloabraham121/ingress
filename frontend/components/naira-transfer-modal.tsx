@@ -58,7 +58,7 @@ export function NairaTransferModal({
         <div className="space-y-3">
           <div>
             <label className="text-xs font-mono text-foreground/60">
-              Recipient Hedera Account ID
+              Recipient EVM Account ID
             </label>
             <input
               className="w-full px-3 py-2 bg-background border border-border text-foreground placeholder-foreground/40 font-mono text-sm focus:outline-none focus:border-primary transition-colors"
