@@ -349,9 +349,9 @@ export const useExchange = (): ExchangeHook => {
       const txHash = depositData.data?.transactionHash;
       console.log("✅ Token deposited!");
       console.log("💰 Naira will be sent to your bank account shortly");
-      console.log(
-        `🔗 View on HashScan: https://hashscan.io/testnet/transaction/${txHash}`
-      );
+      // console.log(
+      //   `🔗 View on HashScan: https://hashscan.io/testnet/transaction/${txHash}`
+      // );
 
       return txHash || "Transaction completed";
     } catch (error) {

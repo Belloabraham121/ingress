@@ -181,8 +181,8 @@ class PriceOracleService {
 
       // Fallback to default prices (MNT using ETH price)
       return {
-        hbar_usd: 3381,
-        hbar_ngn: 5578650,
+        hbar_usd: 0.968,
+        hbar_ngn: 1597,
         usd_ngn: 1650,
         usdc_ngn: 1650,
         usdt_ngn: 1650,

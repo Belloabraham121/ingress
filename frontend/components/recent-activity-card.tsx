@@ -270,7 +270,7 @@ export function RecentActivityCard({
                   <p className="text-xs font-mono text-foreground/50">
                     {formatTime(activity.createdAt)}
                   </p>
-                  <a
+                  {/* <a
                     href={getHashScanUrl(activity.transactionHash)}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -278,7 +278,7 @@ export function RecentActivityCard({
                   >
                     View on HashScan
                     <ExternalLink className="w-3 h-3" />
-                  </a>
+                  </a> */}
                 </div>
               </div>
               <span

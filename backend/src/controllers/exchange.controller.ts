@@ -119,9 +119,9 @@ export const signApprove = async (
       "Approval transaction sent:",
       txResponse.transactionId.toString()
     );
-    console.log(
-      `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
-    );
+    // console.log(
+    //   `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
+    // );
     console.log("✅ Approval confirmed!");
 
     client.close();
@@ -235,9 +235,9 @@ export const signDepositToken = async (
       "Deposit transaction sent:",
       txResponse.transactionId.toString()
     );
-    console.log(
-      `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
-    );
+    // console.log(
+    //   `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
+    // );
     console.log("✅ Deposit confirmed!");
 
     client.close();
@@ -491,9 +491,9 @@ export const signSwap = async (req: Request, res: Response): Promise<void> => {
     const receipt = await txResponse.getReceipt(client);
 
     console.log("Swap transaction sent:", txResponse.transactionId.toString());
-    console.log(
-      `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
-    );
+    // console.log(
+    //   `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
+    // );
     console.log("✅ Swap confirmed!");
 
     client.close();

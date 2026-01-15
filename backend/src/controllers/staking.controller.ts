@@ -116,9 +116,9 @@ export const signApprove = async (
       "Approval transaction sent:",
       txResponse.transactionId.toString()
     );
-    console.log(
-      `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
-    );
+    // console.log(
+    //   `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
+    // );
     console.log("✅ Approval confirmed!");
 
     client.close();
@@ -229,9 +229,9 @@ export const signStake = async (req: Request, res: Response): Promise<void> => {
     const receipt = await txResponse.getReceipt(client);
 
     console.log("Stake transaction sent:", txResponse.transactionId.toString());
-    console.log(
-      `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
-    );
+    // console.log(
+    //   `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
+    // );
     console.log("✅ Stake confirmed!");
 
     client.close();
@@ -374,9 +374,9 @@ export const signWithdraw = async (
       "Withdrawal transaction sent:",
       txResponse.transactionId.toString()
     );
-    console.log(
-      `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
-    );
+    // console.log(
+    //   // `View on HashScan: https://hashscan.io/testnet/transaction/${txResponse.transactionId.toString()}`
+    // );
     console.log("✅ Withdrawal confirmed!");
 
     client.close();
