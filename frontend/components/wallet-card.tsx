@@ -116,7 +116,7 @@ export function WalletCard() {
 
     try {
       await sendHbar(sendAmount);
-      setActionSuccess(`Successfully sent ${sendAmount} HBAR to your wallet`);
+      setActionSuccess(`Successfully sent ${sendAmount} MNT to your wallet`);
       setSendAmount("");
       await loadBalances(); // Refresh balances
       setTimeout(() => {
@@ -124,7 +124,7 @@ export function WalletCard() {
         setActionSuccess("");
       }, 2000);
     } catch (err: any) {
-      setActionError(err.message || "Failed to send HBAR");
+      setActionError(err.message || "Failed to send MNT");
     } finally {
       setActionLoading(false);
     }
@@ -167,7 +167,7 @@ export function WalletCard() {
         amount: result.amount || transferAmount,
       };
     } catch (err: any) {
-      throw new Error(err.message || "Failed to transfer HBAR");
+      throw new Error(err.message || "Failed to transfer MNT");
     }
   };
 
@@ -187,11 +187,11 @@ export function WalletCard() {
           )}
         </div>
 
-        {/* Hedera Wallet Balance */}
+        {/* EVM Wallet Balance */}
         <div className="mb-6 pb-6 border-b border-border/50">
           <div className="flex justify-between items-start mb-2">
             <p className="text-xs font-mono text-foreground/50">
-              HEDERA WALLET (HBAR)
+              EVM WALLET (MNT)
             </p>
             <div className="flex gap-2">
               <button
@@ -219,14 +219,14 @@ export function WalletCard() {
             </div>
           </div>
           <p className="text-2xl font-sentient text-primary mb-4">
-            {walletBalance.toLocaleString()} HBAR
+            {walletBalance.toLocaleString()} MNT
           </p>
 
           {/* Send HBAR Form */}
           {showSendHbar && (
             <div className="mt-4 p-4 border border-border/50 space-y-3">
               <p className="text-xs font-mono text-foreground/60">
-                RECEIVE HBAR TO YOUR WALLET
+                RECEIVE MNT TO YOUR WALLET
               </p>
               <input
                 type="number"
@@ -249,7 +249,7 @@ export function WalletCard() {
                   disabled={actionLoading}
                   className="flex-1 px-4 py-2 bg-primary text-background font-mono text-sm hover:opacity-80 transition-opacity disabled:opacity-50"
                 >
-                  {actionLoading ? "PROCESSING..." : "RECEIVE HBAR"}
+                  {actionLoading ? "PROCESSING..." : "RECEIVE MNT"}
                 </button>
                 <button
                   onClick={() => {
@@ -270,7 +270,7 @@ export function WalletCard() {
           {showTransferHbar && (
             <div className="mt-4 p-4 border border-border/50 space-y-3">
               <p className="text-xs font-mono text-foreground/60">
-                SEND HBAR TO ANOTHER ACCOUNT
+                SEND MNT TO ANOTHER ACCOUNT
               </p>
               <input
                 type="text"
@@ -320,7 +320,7 @@ export function WalletCard() {
                   disabled={actionLoading}
                   className="flex-1 px-4 py-2 bg-primary text-background font-mono text-sm hover:opacity-80 transition-opacity disabled:opacity-50"
                 >
-                  {actionLoading ? "PROCESSING..." : "SEND HBAR"}
+                  {actionLoading ? "PROCESSING..." : "SEND MNT"}
                 </button>
                 <button
                   onClick={() => {

@@ -81,7 +81,7 @@ export function RecentActivityCard({
     if (!token) return "tokens";
     const t = token.trim();
     if (t.toUpperCase() === "NGN") return "NGN";
-    if (t.toUpperCase() === "HBAR") return "HBAR";
+    if (t.toUpperCase() === "MNT") return "MNT";
     if (t.startsWith("0x")) {
       return addressToSymbol[t.toLowerCase()] || t;
     }

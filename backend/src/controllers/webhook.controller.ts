@@ -324,13 +324,22 @@ export const getTransactionHistory = async (
     const pageNum = parseInt(page as string);
     const skip = (pageNum - 1) * limitNum;
 
-    const transactions = await Transaction.find({ userId })
+    // Filter transactions to only show 2025 and later
+    const startOf2025 = new Date('2025-01-01T00:00:00.000Z');
+    
+    const transactions = await Transaction.find({ 
+      userId,
+      createdAt: { $gte: startOf2025 }
+    })
       .sort({ createdAt: -1 })
       .limit(limitNum)
       .skip(skip)
       .lean();
 
-    const total = await Transaction.countDocuments({ userId });
+    const total = await Transaction.countDocuments({ 
+      userId,
+      createdAt: { $gte: startOf2025 }
+    });
 
     res.status(200).json({
       success: true,

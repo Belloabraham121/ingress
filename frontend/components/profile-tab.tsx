@@ -28,7 +28,6 @@ export function ProfileTab() {
   const [isEditing, setIsEditing] = useState(false);
   const [isChangingPassword, setIsChangingPassword] = useState(false);
   const [showWalletAddress, setShowWalletAddress] = useState(false);
-  const [showHederaId, setShowHederaId] = useState(false);
   const [showAccountNumber, setShowAccountNumber] = useState(false);
   const [isCreatingBankAccount, setIsCreatingBankAccount] = useState(false);
 
@@ -304,11 +303,11 @@ export function ProfileTab() {
       <div className="border border-border bg-background p-6">
         <h2 className="text-lg font-sentient mb-6">WALLET INFORMATION</h2>
 
-        {/* Hedera Wallet Balance */}
+        {/* EVM Wallet Balance */}
         <div className="mb-6 pb-6 border-b border-border/50">
           <div className="flex justify-between items-start mb-2">
             <p className="text-xs font-mono text-foreground/60">
-              HEDERA WALLET BALANCE
+              EVM WALLET BALANCE
             </p>
             <button
               onClick={refreshBalance}
@@ -319,42 +318,11 @@ export function ProfileTab() {
             </button>
           </div>
           <p className="text-3xl font-sentient text-primary">
-            {wallet.balance.toLocaleString()} HBAR
+            {wallet.balance.toLocaleString()} MNT
           </p>
           <p className="text-xs font-mono text-foreground/50 mt-2">
             Status: {wallet.isActivated ? "✓ Activated" : "⚠ Not Activated"}
           </p>
-        </div>
-
-        {/* Hedera Account ID */}
-        <div className="mb-6 pb-6 border-b border-border/50">
-          <div className="flex justify-between items-start mb-3">
-            <p className="text-xs font-mono text-foreground/60">
-              HEDERA ACCOUNT ID
-            </p>
-            <button
-              onClick={() => setShowHederaId(!showHederaId)}
-              className="text-xs font-mono text-primary hover:text-primary/80 transition-colors"
-            >
-              {showHederaId ? "[HIDE]" : "[SHOW]"}
-            </button>
-          </div>
-
-          {showHederaId ? (
-            <div className="flex items-center gap-3">
-              <p className="text-sm font-mono text-foreground break-all">
-                {wallet.accountId}
-              </p>
-              <button
-                onClick={() => copyToClipboard(wallet.accountId)}
-                className="px-3 py-2 border border-border text-xs font-mono text-foreground/60 hover:border-primary hover:text-primary transition-colors [clip-path:polygon(2px_0,calc(100%_-_2px)_0,100%_2px,100%_calc(100%_-_2px),calc(100%_-_2px)_100%,2px_100%,0_calc(100%_-_2px),0_2px)]"
-              >
-                [COPY]
-              </button>
-            </div>
-          ) : (
-            <p className="text-sm font-mono text-foreground/40">••••••••••••</p>
-          )}
         </div>
 
         {/* EVM Wallet Address */}

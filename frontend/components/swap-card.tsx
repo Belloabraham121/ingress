@@ -26,19 +26,19 @@ const AVAILABLE_TOKENS: TokenOption[] = [
   { symbol: "USDC", name: "USD Coin", address: TOKENS.USDC },
   { symbol: "USDT", name: "Tether USD", address: TOKENS.USDT },
   { symbol: "DAI", name: "Dai Stablecoin", address: TOKENS.DAI },
-  { symbol: "HBAR", name: "Hedera" },
+  { symbol: "MNT", name: "Mantle EVM" },
 ];
 
 // Helper to get token decimals
 const getTokenDecimals = (symbol: string): number => {
-  if (symbol === "HBAR") return 8; // display purposes; on-chain is 8
+  if (symbol === "MNT") return 18; // MNT uses 18 decimals
   return 18; // All stables and others use 18 in our utils/contracts
 };
 
 // Display precision (UI) independent of on-chain decimals
 const getDisplayDecimals = (symbol: string): number => {
   if (symbol === "USDC" || symbol === "USDT" || symbol === "DAI") return 1; // e.g., 6.9
-  if (symbol === "HBAR") return 4;
+  if (symbol === "MNT") return 4;
   return 4;
 };
 
@@ -246,8 +246,8 @@ export function SwapCard() {
           transactionHash: data.data?.transactionHash,
         };
       }
-      // Case 3: Naira → HBAR (using existing NGN balance)
-      else if (fromToken.symbol === "NGN" && toToken.symbol === "HBAR") {
+      // Case 3: Naira → MNT (using existing NGN balance)
+      else if (fromToken.symbol === "NGN" && toToken.symbol === "MNT") {
         const token = getToken();
         const resp = await fetch(`${API_URL}/exchange/spend-naira`, {
           method: "POST",
@@ -274,8 +274,8 @@ export function SwapCard() {
           transactionHash: data.data?.transactionHash,
         };
       }
-      // Case 4: HBAR → Token (Deposit then transfer)
-      else if (fromToken.symbol === "HBAR" && toToken.address) {
+      // Case 4: MNT → Token (Deposit then transfer)
+      else if (fromToken.symbol === "MNT" && toToken.address) {
         const token = getToken();
         // Step 1: Deposit HBAR to Exchange so user's HBAR is deducted
         try {
@@ -379,8 +379,8 @@ export function SwapCard() {
           transactionHash: data.data?.transactionHash || "Swap executed",
         };
       }
-      // Case 6: HBAR → Naira (cashout via Paystack)
-      else if (fromToken.symbol === "HBAR" && toToken.symbol === "NGN") {
+      // Case 6: MNT → Naira (cashout via Paystack)
+      else if (fromToken.symbol === "MNT" && toToken.symbol === "NGN") {
         const token = getToken();
         const resp = await fetch(`${API_URL}/exchange/cashout-hbar`, {
           method: "POST",
@@ -406,12 +406,12 @@ export function SwapCard() {
         };
       }
 
-      // Case 7: Token → HBAR (not yet supported)
+      // Case 7: Token → MNT (not yet supported)
       else {
         alert(
           "⚠️ This swap combination is not yet supported. Supported swaps:\n\n" +
             "✅ Token ↔ NGN\n" +
-            "✅ HBAR ↔ NGN\n" +
+            "✅ MNT ↔ NGN\n" +
             "✅ Token ↔ Token (via NGN)\n"
         );
         return { success: false };
@@ -644,7 +644,7 @@ export function SwapCard() {
             <div className="pl-2">
               1 USDT = ₦{rates[TOKENS.USDT.toLowerCase()]?.toFixed(2)}
             </div>
-            <div className="pl-2">1 HBAR = ₦{rates.hbar?.toFixed(2)}</div>
+            <div className="pl-2">1 MNT = ₦{rates.hbar?.toFixed(2)}</div>
           </div>
         )}
 

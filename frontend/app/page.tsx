@@ -99,7 +99,7 @@ export default function Home() {
             />
             <FeatureCard
               title="Stake & Earn"
-              description="Earn daily rewards by staking your USDT, USDC, or ETH in our secure staking pools with competitive APY rates."
+              description="Earn daily rewards by staking your USDT, USDC, or MNT in our secure staking pools with competitive APY rates."
               icon="💰"
             />
             <FeatureCard

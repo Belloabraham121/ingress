@@ -66,7 +66,7 @@ export function HbarTransferConfirmationModal({
         setShowSuccess(true);
       }
     } catch (err: any) {
-      setError(err.message || "Failed to transfer HBAR. Please try again.");
+      setError(err.message || "Failed to transfer MNT. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -136,7 +136,7 @@ export function HbarTransferConfirmationModal({
               </span>
               <div className="text-right">
                 <p className="text-2xl font-sentient text-primary">
-                  {amount} HBAR
+                  {amount} MNT
                 </p>
               </div>
             </div>
@@ -149,7 +149,7 @@ export function HbarTransferConfirmationModal({
                     CURRENT BALANCE
                   </span>
                   <span className="text-sm font-mono text-foreground">
-                    {currentBalance} HBAR
+                    {currentBalance} MNT
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
@@ -157,7 +157,7 @@ export function HbarTransferConfirmationModal({
                     REMAINING BALANCE
                   </span>
                   <span className="text-sm font-mono text-foreground font-bold">
-                    {remainingBalance} HBAR
+                    {remainingBalance} MNT
                   </span>
                 </div>
               </div>
@@ -208,14 +208,14 @@ export function HbarTransferConfirmationModal({
           isOpen={showSuccess}
           onClose={handleSuccessClose}
           title="[TRANSFER SUCCESSFUL]"
-          message="Your HBAR transfer has been completed successfully"
+          message="Your MNT transfer has been completed successfully"
           details={[
             { label: "FROM", value: transactionDetails.from },
             { label: "TO", value: transactionDetails.to },
-            { label: "AMOUNT", value: `${transactionDetails.amount} HBAR` },
+            { label: "AMOUNT", value: `${transactionDetails.amount} MNT` },
             {
               label: "NEW BALANCE",
-              value: currentBalance ? `${remainingBalance} HBAR` : "—",
+              value: currentBalance ? `${remainingBalance} MNT` : "—",
             },
           ]}
           transactionHash={transactionDetails.txId}

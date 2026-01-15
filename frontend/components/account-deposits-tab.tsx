@@ -241,16 +241,6 @@ export function AccountDepositsTab() {
               ✓ Account active. Use this account number to fund your wallet.
             </p>
 
-            {/* Important Note for Local Development */}
-            <div className="p-3 border border-yellow-500/30 bg-yellow-500/5 [clip-path:polygon(4px_0,calc(100%_-_4px)_0,100%_4px,100%_calc(100%_-_4px),calc(100%_-_4px)_100%,4px_100%,0_calc(100%_-_4px),0_4px)]">
-              <p className="text-xs font-mono text-yellow-600 dark:text-yellow-500 mb-1">
-                💡 TESTING TIP: Webhooks don't work on localhost
-              </p>
-              <p className="text-xs font-mono text-foreground/60">
-                After making a deposit, click the [REFRESH] button next to your
-                balance to update it manually.
-              </p>
-            </div>
           </div>
 
           {/* Fund with Card Button */}
