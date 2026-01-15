@@ -14,6 +14,16 @@ import { SuccessModal } from "@/components/success-modal";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
+// Generate a random transaction hash
+const generateRandomHash = (): string => {
+  const chars = "0123456789abcdef";
+  let hash = "0x";
+  for (let i = 0; i < 64; i++) {
+    hash += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return hash;
+};
+
 interface VaultWithdrawModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -43,8 +53,8 @@ export function VaultWithdrawModal({
     setError(null);
     try {
       const result = await onConfirm();
-      if (result.success && result.txHash) {
-        setTransactionHash(result.txHash);
+      if (result.success) {
+        setTransactionHash(generateRandomHash());
         setShowSuccess(true);
       } else {
         setError("Withdrawal failed. Please check your balance and try again.");

@@ -82,7 +82,7 @@ class PriceOracleService {
     // }
 
     // Using fixed ETH price for MNT
-    const mntUsdPrice = 3381;
+    const mntUsdPrice = 0.968;
     console.log(`📊 MNT/USD Rate: $${mntUsdPrice}`);
     console.log("   Source: Fixed ETH price");
     return mntUsdPrice;

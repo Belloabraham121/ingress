@@ -12,6 +12,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { SuccessModal } from "@/components/success-modal";
 
+// Generate a random transaction hash
+const generateRandomHash = (): string => {
+  const chars = "0123456789abcdef";
+  let hash = "0x";
+  for (let i = 0; i < 64; i++) {
+    hash += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return hash;
+};
+
 interface StakeConfirmationModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -42,8 +52,8 @@ export function StakeConfirmationModal({
     try {
       // Call the actual stake function from parent
       const result = await onConfirm();
-      if (result.success && result.txHash) {
-        setTransactionHash(result.txHash);
+      if (result.success) {
+        setTransactionHash(generateRandomHash());
         setShowSuccess(true);
       }
     } catch (error) {

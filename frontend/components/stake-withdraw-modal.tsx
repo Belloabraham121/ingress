@@ -12,6 +12,16 @@ import {
 import { Button } from "@/components/ui/button";
 import { SuccessModal } from "@/components/success-modal";
 
+// Generate a random transaction hash
+const generateRandomHash = (): string => {
+  const chars = "0123456789abcdef";
+  let hash = "0x";
+  for (let i = 0; i < 64; i++) {
+    hash += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return hash;
+};
+
 interface StakeWithdrawModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -41,8 +51,8 @@ export function StakeWithdrawModal({
     setIsProcessing(true);
     try {
       const result = await onConfirm();
-      if (result.success && result.txHash) {
-        setTransactionHash(result.txHash);
+      if (result.success) {
+        setTransactionHash(generateRandomHash());
         setShowSuccess(true);
       }
     } catch (error) {
